@@ -221,6 +221,9 @@ class SparkSettingsActivity : Activity() {
     private var sendLabel: TextView? = null
     private var renewalCount = 0
 
+    /** 当前页的会话 id（发送按钮默认发给它）。 */
+    private var currentPageIds: List<String> = emptyList()
+
     private val snapshotReceiver =
         object : BroadcastReceiver() {
             override fun onReceive(
@@ -599,7 +602,7 @@ class SparkSettingsActivity : Activity() {
                 body.addView(infoCard("待对方回复", waitingReply.toString()))
                 body.addView(infoCard("待重燃", renewal.count { it.state == SPARK_RECOVER }.toString()))
                 body.addView(infoCard("今日已续", conversations.count { it.state == SPARK_DONE }.toString()))
-                body.addView(infoCard("待续会话", config.selectedIds().size.toString()))
+                body.addView(infoCard("未燃会话", config.selectedIds().size.toString()))
                 body.addView(
                     infoCard(
                         "快照时间",
@@ -1334,11 +1337,13 @@ class SparkSettingsActivity : Activity() {
         val hidden = config.snapshots.filter { it.isHidden }
         // 标签被删掉后，筛选状态跟着失效，避免列表被一个不存在的标签筛成空
         sparkTagFilter.removeAll { id -> config.tag(id) == null }
-        // cc 版：未燃 / 已燃 只含有火花的会话；无火花单独一张卡片，放在「全部」页底部
+        // 未燃：全量里判 needsRenewal（手动移入的无火花会话也会进来）
+        // 已燃：只含有火花的（无火花本来就没"已燃"可言）
+        // 无火花：全量里既没火花、也没被手动移入的
         val withSpark = conversations.filter { it.hasSpark }
-        val noSpark = conversations.filterNot { it.hasSpark }
-        val renewal = withSpark.filter { config.needsRenewal(it) }
+        val renewal = conversations.filter { config.needsRenewal(it) }
         val idle = withSpark.filterNot { config.needsRenewal(it) }
+        val noSpark = conversations.filterNot { it.hasSpark || config.needsRenewal(it) }
         val page = column().apply { setPadding(dp(16), 0, dp(16), dp(8)) }
         rowChecks.clear()
         rowViews.clear()
@@ -1366,7 +1371,7 @@ class SparkSettingsActivity : Activity() {
 
         // 立即手动发送：勾选了就发勾选的，没勾就发「已选目标」全部（不受总开关与今日已发限制）
         // 目标要在点击时现算：勾选框是页面建好之后才变的，构建时算会拿到旧列表
-        fun currentTargets(): List<String> = if (selected.isNotEmpty()) selected.toList() else renewal.map { it.conversationId }
+        fun currentTargets(): List<String> = if (selected.isNotEmpty()) selected.toList() else currentPageIds
         page.addView(
             row().apply {
                 setPadding(0, dp(6), 0, 0)
@@ -1390,6 +1395,7 @@ class SparkSettingsActivity : Activity() {
                 PAGE_UNSELECTED -> idle
                 else -> withSpark   // 全部：有火花的（含隐藏由下方单独卡片展示）
             }
+        currentPageIds = current.map { it.conversationId }
         val list = column().apply { setPadding(0, dp(8), 0, dp(16)) }
         if (config.snapshots.isEmpty()) {
             list.addView(
@@ -1871,7 +1877,7 @@ class SparkSettingsActivity : Activity() {
         if (selected.isNotEmpty()) {
             "发送给选中的 ${selected.size} 个"
         } else {
-            "发送全部 $renewalCount 个"
+            "发送全部 ${currentPageIds.size} 个"
         }
 
     /**
@@ -1892,7 +1898,7 @@ class SparkSettingsActivity : Activity() {
             snapshot.state == SPARK_DONE -> "火花 ${snapshot.days} 天 · 今日已续"
             snapshot.state == SPARK_PENDING ->
                 if (sentToday) {
-                    "火花 ${snapshot.days} 天 · 已发，等对方回"
+                    "火花 ${snapshot.days} 天 · 今日已发"
                 } else {
                     "火花 ${snapshot.days} 天 · 待发"
                 }
@@ -1904,7 +1910,7 @@ class SparkSettingsActivity : Activity() {
                     }
                 buildString {
                     append("火花 ").append(snapshot.days).append(" 天 · ").append(progress)
-                    append(if (sentToday) " · 已发，等对方回" else " · 待发")
+                    append(if (sentToday) " · 今日已发" else " · 待发")
                     if (snapshot.expireText.isNotBlank()) append(" · ").append(snapshot.expireText)
                 }
             }
@@ -4065,7 +4071,7 @@ object SparkPreview {
             "name" to name,
             "days" to (snapshot?.days ?: 7),
             "state" to (snapshot?.state ?: 2),
-            "stateText" to (snapshot?.stateText?.takeIf { it.isNotBlank() } ?: "待续"),
+            "stateText" to (snapshot?.stateText?.takeIf { it.isNotBlank() } ?: "未燃"),
             "peerUid" to (snapshot?.peerUid?.takeIf { it.isNotBlank() } ?: "0"),
             "conversationId" to (snapshot?.conversationId ?: "sample"),
         )

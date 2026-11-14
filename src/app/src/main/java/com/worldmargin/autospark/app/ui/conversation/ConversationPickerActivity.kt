@@ -163,7 +163,7 @@ class ConversationPickerActivity : Activity() {
     private fun confirmText(): String = "确定 ${selected.size}"
 
     /** 当前搜索 / 标签 / 来源条件下可见的会话（已隐藏的永远不出现）。 */
-    /** 续火花页里的「已选目标」：自动判定的 target + 手动移入的 target。 */
+    /** 续火花页「未燃」里的 id：自动判定需要续的 + 手动移入的。 */
     private fun outerTargets(config: SparkConfig): Set<String> = config.selectedIds() + config.forcedRenew
 
     private fun visible(): List<ConversationSnapshot> {
@@ -176,10 +176,13 @@ class ConversationPickerActivity : Activity() {
                 .filter { !it.isHidden }
                 .filter { !onlySingle || !it.isGroup }
                 .filter {
-                    val isTarget = it.conversationId in outerTargets(config)
+                    // 与「续火花」页口径保持一致：
+                    //   未燃 = 需要续（含手动移入的无火花会话）
+                    //   已燃 = 有火花且今天已互动
+                    //   全部 = 所有未隐藏（含无火花，这里是「选会话」的场景，需要能选到它们）
                     when (selectedFilter) {
-                        1 -> isTarget
-                        2 -> !isTarget
+                        1 -> config.needsRenewal(it)
+                        2 -> it.hasSpark && !config.needsRenewal(it)
                         else -> true
                     }
                 }
@@ -224,7 +227,7 @@ class ConversationPickerActivity : Activity() {
                     .thenBy { it.displayName },
             )
         listHost.addView(
-            text("共 ${sorted.size} 个 · 已勾选 ${selected.size}；续火花页的待续会话排在前面", 12f, COLOR_DIM).apply {
+            text("共 ${sorted.size} 个 · 已勾选 ${selected.size}；续火花页的未燃会话排在前面", 12f, COLOR_DIM).apply {
                 setPadding(0, dp(4), 0, dp(4))
             },
         )
@@ -357,7 +360,7 @@ class ConversationPickerActivity : Activity() {
     private fun refreshChips() {
         val config = ConfigStore.load(this)
         selectedHost.removeAllViews()
-        listOf("全部" to 0, "待续" to 1, "已续" to 2).forEach { (label, value) ->
+        listOf("未燃" to 1, "已燃" to 2, "全部" to 0).forEach { (label, value) ->
             selectedHost.addView(chip(label, selectedFilter == value) {
                 selectedFilter = value
                 refreshChips()

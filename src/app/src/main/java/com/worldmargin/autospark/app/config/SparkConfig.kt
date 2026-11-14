@@ -983,9 +983,17 @@ object ConfigCodec {
             .toString()
     }
 
-    fun decode(text: String): SparkConfig {
+    fun decode(text: String): SparkConfig = decodeOrNull(text) ?: SparkConfig()
+
+    /**
+     * 解析配置。
+     *
+     * **文件损坏（JSON 不合法）返回 null**，与「空文件」（返回空配置）区分开 ——
+     * 否则 ConfigStore 会把一份损坏文件当成空配置，下一次 update 就把用户数据真正清空了。
+     */
+    fun decodeOrNull(text: String): SparkConfig? {
         if (text.isBlank()) return SparkConfig()
-        val root = runCatching { JSONObject(text) }.getOrNull() ?: return SparkConfig()
+        val root = runCatching { JSONObject(text) }.getOrNull() ?: return null
 
         val groups = mutableListOf<TemplateGroup>()
         root.optJSONArray(KEY_GROUPS)?.let { array ->
