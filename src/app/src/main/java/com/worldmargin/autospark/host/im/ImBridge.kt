@@ -221,6 +221,25 @@ object ImBridge {
         out.put("end", current.optLong("end"))
         out.put("recoverDays", current.optInt("recover_days"))
         out.put("recoverNeedDays", current.optInt("recover_need_days", root.optInt("can_recover_days")))
+        // 抖音原生展示文案（如「重燃中 2/3」）。recover_days/recover_need_days 是时间轴上的预测值，
+        // 直接拼出来的进度会和宿主界面不一致（例：宿主显示 2/3，这两个字段却是 3/1）。
+        out.put("flameText", current.optString("text"))
+        // 未来时间段的提示（如「6 天后消失」），没有就空串
+        runCatching {
+            val segs = root.optJSONArray("flame_infos")
+            if (segs != null) {
+                for (i in 0 until segs.length()) {
+                    val seg = segs.optJSONObject(i) ?: continue
+                    if (seg.optLong("start") > nowSec) {
+                        val t = seg.optString("text")
+                        if (t.contains("消失")) {
+                            out.put("expireText", t)
+                            break
+                        }
+                    }
+                }
+            }
+        }
         out.put("expireTime", expireTime)
         // 今天还没互动（火苗灰 / 待重燃）就要发；今天已互动则今天不用再发
         out.put("needsRenewal", state == 2 || state == 3)

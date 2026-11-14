@@ -148,6 +148,10 @@ data class ConversationSnapshot(
     val stateText: String,
     val recoverDays: Int,
     val recoverNeedDays: Int,
+    /** 宿主原生展示文案（如「重燃中 2/3」）；recoverDays/recoverNeedDays 是时间轴预测值，界面用这个。 */
+    val flameText: String = "",
+    /** 未来提示（如「6 天后消失」），没有就是空串。 */
+    val expireText: String = "",
     val hasSpark: Boolean,
     val needsRenewal: Boolean,
     val isGroup: Boolean,
@@ -865,6 +869,8 @@ object ConfigCodec {
                     .put("stateText", snapshot.stateText)
                     .put("recoverDays", snapshot.recoverDays)
                     .put("recoverNeedDays", snapshot.recoverNeedDays)
+                    .put("flameText", snapshot.flameText)
+                    .put("expireText", snapshot.expireText)
                     .put("hasSpark", snapshot.hasSpark)
                     .put("needsRenewal", snapshot.needsRenewal)
                     .put("isGroup", snapshot.isGroup)
@@ -1036,6 +1042,8 @@ object ConfigCodec {
                         stateText = item.optString("stateText"),
                         recoverDays = item.optInt("recoverDays"),
                         recoverNeedDays = item.optInt("recoverNeedDays"),
+                        flameText = item.optString("flameText"),
+                        expireText = item.optString("expireText"),
                         hasSpark = item.optBoolean("hasSpark"),
                         needsRenewal = item.optBoolean("needsRenewal"),
                         isGroup = item.optBoolean("isGroup"),
