@@ -925,8 +925,7 @@ object AutoSparkBridge {
                 // 手动点名：只发这些，不再看抖音判定与手动归属
                 if (conversationId !in only) continue
             } else {
-                // 群聊默认不参与自动发送：只有被手动移进「已选目标」才发（界面里群聊单独一张卡片）
-                if (isGroup && conversationId !in config.forcedRenew) continue
+                // cc 版：群聊与单聊同等参与自动续火花（不再要求先手动移入）
                 // 「需要续」来自抖音判定，可被管理界面的手动移动覆盖
                 if (conversationId in config.forcedSkip) continue
                 val spark = conversation.optJSONObject("spark")

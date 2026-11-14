@@ -395,7 +395,7 @@ class SparkSettingsActivity : Activity() {
     /** 手动发送前确认一次（避免误点直接群发）。 */
     private fun confirmManualSend(targets: List<String>) {
         if (targets.isEmpty()) {
-            Toast.makeText(this, "没有可发送的会话：先去「已选目标」勾几个，或等抖音判定出待续会话", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "没有可发送的会话：先去「待续」勾几个，或等抖音判定出待续会话", Toast.LENGTH_SHORT).show()
             return
         }
         val config = ConfigStore.load(this)
@@ -558,8 +558,7 @@ class SparkSettingsActivity : Activity() {
                 when (tab) {
                     TAB_SPARK -> buildSparkPage(config)
                     TAB_TEMPLATE -> buildTemplatesPage(config)
-                    TAB_TAG -> buildTagPage(config)
-                    TAB_FUNCTIONS -> buildFunctionsPage(config)
+                            TAB_FUNCTIONS -> buildFunctionsPage(config)
                     else -> buildSettingsPage(config)
                 }
             }
@@ -598,7 +597,7 @@ class SparkSettingsActivity : Activity() {
                 body.addView(infoCard("待对方回复", waitingReply.toString()))
                 body.addView(infoCard("待重燃", renewal.count { it.state == SPARK_RECOVER }.toString()))
                 body.addView(infoCard("今日已续", conversations.count { it.state == SPARK_DONE }.toString()))
-                body.addView(infoCard("已选目标", config.selectedIds().size.toString()))
+                body.addView(infoCard("待续会话", config.selectedIds().size.toString()))
                 body.addView(
                     infoCard(
                         "快照时间",
@@ -857,7 +856,7 @@ class SparkSettingsActivity : Activity() {
                 render()
                 breatheGuideTarget("刷新会话")
             },
-            GuideStep(targeted, "选中要续的会话", "把会话移进「已选目标」，或勾选后手动发送", null),
+            GuideStep(targeted, "选中要续的会话", "把会话移进「待续」页，或勾选后手动发送", null),
             GuideStep(templated, "给会话套模板", "展开一个内置模板，点「选会话继承」套给会话", "去模板") {
                 openGuideTemplates()
             },
@@ -867,8 +866,6 @@ class SparkSettingsActivity : Activity() {
 
     /** 进阶路线：标签、搜索、多模板、文档给 AI、自定义模板、宏。 */
     private fun advancedSteps(config: SparkConfig): List<GuideStep> {
-        val tagged = config.tags.isNotEmpty()
-        val assigned = config.conversationTags.values.any { it.isNotEmpty() }
         val searched = config.guideSearched
         val distinctTemplates = config.conversations.mapNotNull { it.inheritFrom }.filter { it != SparkConfig.BUILTIN_BLANK }.distinct().size
         val multiTemplate = distinctTemplates >= 2
@@ -877,15 +874,6 @@ class SparkSettingsActivity : Activity() {
         val hasMacro = config.macros.isNotEmpty()
         val mounted = config.macros.any { it.appliesTo.isNotEmpty() || it.templateOnly.isNotEmpty() }
         return listOf(
-            GuideStep(tagged, "创建标签", "在「标签」页新增一个标签，比如家人 / 同学", "去标签") {
-                tab = TAB_TAG
-                render()
-                breatheGuideTarget("新增标签")
-            },
-            GuideStep(assigned, "给会话打标签", "点标签卡片配置目标，之后可按标签筛选", "去标签页") {
-                tab = TAB_TAG
-                render()
-            },
             GuideStep(searched, "用搜索找会话", "在续火花页顶部按昵称 / 备注搜一次", "去搜索") {
                 tab = TAB_SPARK
                 render()
@@ -1366,7 +1354,14 @@ class SparkSettingsActivity : Activity() {
         renewalCount = renewal.size
 
         page.addView(
-            segmented(listOf("已选目标 ${renewal.size}", "未选目标 ${idle.size}"), sparkPage) { index ->
+            segmented(
+                listOf(
+                    "待续 ${renewal.size}",
+                    "已续 ${idle.size}",
+                    "全部 ${config.snapshots.size}",
+                ),
+                sparkPage,
+            ) { index ->
                 if (index != sparkPage) {
                     sparkPage = index
                     selected.clear()
@@ -1395,24 +1390,21 @@ class SparkSettingsActivity : Activity() {
             },
         )
 
-        val current = if (sparkPage == PAGE_SELECTED) renewal else idle
+        val current =
+            when (sparkPage) {
+                PAGE_SELECTED -> renewal
+                PAGE_UNSELECTED -> idle
+                else -> config.snapshots   // 全部：含已续、无火花、被隐藏
+            }
         val list = column().apply { setPadding(0, dp(8), 0, dp(16)) }
-        if (conversations.isEmpty()) {
+        if (config.snapshots.isEmpty()) {
             list.addView(
-                text(
-                    if (config.snapshots.isEmpty()) {
-                        "没有会话快照。先打开一次抖音，再回来点「设置 → 刷新会话」。"
-                    } else {
-                        "所有会话都已隐藏（连续 ${SparkConfig.HIDDEN_AFTER_MISSES} 次未出现）。打开抖音刷新后会重新出现。"
-                    },
-                    14f,
-                    COLOR_DIM,
-                ),
+                text("没有会话快照。先打开一次抖音，再回来点「设置 → 刷新会话」。", 14f, COLOR_DIM),
             )
         } else {
             list.addView(
                 text(
-                    "快照 " + SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(conversations.maxOf { it.updatedAt })) +
+                    "快照 " + SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(current.maxOfOrNull { it.updatedAt } ?: System.currentTimeMillis())) +
                         "　长按整行或勾选可多选",
                     12f,
                     COLOR_DIM,
@@ -1421,7 +1413,11 @@ class SparkSettingsActivity : Activity() {
             if (current.isEmpty()) {
                 list.addView(
                     text(
-                        if (sparkPage == PAGE_SELECTED) "（暂无需要续火花的会话）" else "（暂无未选目标）",
+                        when (sparkPage) {
+                            PAGE_SELECTED -> "（暂无需要续火花的会话）"
+                            PAGE_UNSELECTED -> "（暂无已续会话）"
+                            else -> "（暂无会话）"
+                        },
                         13f,
                         COLOR_DIM,
                     ).apply { setPadding(0, dp(12), 0, 0) },
@@ -1598,7 +1594,7 @@ class SparkSettingsActivity : Activity() {
         val name = snapshot.displayName.ifBlank { "(无名)" }
         AlertDialog
             .Builder(this)
-            .setTitle("把「$name」移出已选目标？")
+            .setTitle("把「$name」移出待续？")
             .setMessage("它仍然留在「被隐藏」列表里，快照保留到 30 天后自动清除。")
             .setPositiveButton("移出") { _, _ ->
                 ConfigStore.update(this) { config ->
@@ -1607,7 +1603,7 @@ class SparkSettingsActivity : Activity() {
                         forcedSkip = config.forcedSkip - snapshot.conversationId,
                     )
                 }
-                Toast.makeText(this, "已移出已选目标", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "已移出待续", Toast.LENGTH_SHORT).show()
                 render()
             }
             .setNegativeButton("取消", null)
@@ -1779,11 +1775,11 @@ class SparkSettingsActivity : Activity() {
             addView(
                 row().apply {
                     addView(
-                        iconButton(UiKit.Icons.ADD, "移入已选目标", primary = true, compact = true) { moveSelection(true) }
+                        iconButton(UiKit.Icons.ADD, "移入待续", primary = true, compact = true) { moveSelection(true) }
                             .apply { layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f) },
                     )
                     addView(
-                        iconButton(UiKit.Icons.REMOVE, "移出到未选目标", compact = true) { moveSelection(false) }
+                        iconButton(UiKit.Icons.REMOVE, "移出到已续", compact = true) { moveSelection(false) }
                             .apply { layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f) },
                     )
                 },
@@ -3892,12 +3888,11 @@ class SparkSettingsActivity : Activity() {
     }
 
     companion object {
-        val TABS = listOf("续火花", "模板", "标签", "宏/函数", "设置")
+        val TABS = listOf("续火花", "模板", "宏/函数", "设置")
         val TAB_ICONS =
             listOf(
                 UiKit.Icons.FIRE,
                 UiKit.Icons.TEMPLATE,
-                UiKit.Icons.TAG,
                 UiKit.Icons.CODE,
                 UiKit.Icons.GEAR,
             )
@@ -3918,12 +3913,12 @@ class SparkSettingsActivity : Activity() {
 
         const val TAB_SPARK = 0
         const val TAB_TEMPLATE = 1
-        const val TAB_TAG = 2
-        const val TAB_FUNCTIONS = 3
-        const val TAB_SETTINGS = 4
+        const val TAB_FUNCTIONS = 2
+        const val TAB_SETTINGS = 3
 
         const val PAGE_SELECTED = 0
         const val PAGE_UNSELECTED = 1
+        const val PAGE_ALL = 2
 
         /** 「宏/函数」页内的分页下标。 */
         const val PAGE_MACROS = 0

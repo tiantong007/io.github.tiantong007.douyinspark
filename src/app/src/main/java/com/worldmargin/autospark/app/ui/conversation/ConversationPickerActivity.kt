@@ -224,7 +224,7 @@ class ConversationPickerActivity : Activity() {
                     .thenBy { it.displayName },
             )
         listHost.addView(
-            text("共 ${sorted.size} 个 · 已勾选 ${selected.size}；续火花页的已选目标和标签命中排在前面", 12f, COLOR_DIM).apply {
+            text("共 ${sorted.size} 个 · 已勾选 ${selected.size}；续火花页的待续会话排在前面", 12f, COLOR_DIM).apply {
                 setPadding(0, dp(4), 0, dp(4))
             },
         )
@@ -357,7 +357,7 @@ class ConversationPickerActivity : Activity() {
     private fun refreshChips() {
         val config = ConfigStore.load(this)
         selectedHost.removeAllViews()
-        listOf("全部" to 0, "已选目标" to 1, "未选目标" to 2).forEach { (label, value) ->
+        listOf("全部" to 0, "待续" to 1, "已续" to 2).forEach { (label, value) ->
             selectedHost.addView(chip(label, selectedFilter == value) {
                 selectedFilter = value
                 refreshChips()

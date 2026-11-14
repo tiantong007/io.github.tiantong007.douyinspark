@@ -387,51 +387,6 @@ class ConversationEditActivity : Activity() {
                 )
             },
         )
-        // 标签：直接点小药丸开关，不走弹窗；只用于整理 / 筛选，不影响发送
-        val ownTags = config.conversationTags[conversationId].orEmpty()
-        info.addView(
-            row().apply {
-                setPadding(0, dp(2), 0, 0)
-                addView(text("标签", 12f, COLOR_DIM).apply { setPadding(0, 0, dp(6), 0) })
-                val shelf =
-                    android.widget.HorizontalScrollView(this@ConversationEditActivity).apply {
-                        isHorizontalScrollBarEnabled = false
-                    }
-                shelf.addView(
-                    row().apply {
-                        if (config.tags.isEmpty()) {
-                            addView(tagChipButton("＋ 新建标签", false) {
-                                openTagTab()
-                            })
-                        } else {
-                            config.tags.forEach { tag ->
-                                val on = tag.id in ownTags
-                                addView(tagChipButton(tag.name, on) {
-                                    val next = if (on) ownTags - tag.id else ownTags + tag.id
-                                    ConfigStore.update(this@ConversationEditActivity) { it.withConversationTags(conversationId, next) }
-                                    renderInfo()
-                                })
-                            }
-                        }
-                    },
-                )
-                addView(shelf, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-                addView(
-                    text("管理", 12f, COLOR_ACCENT).apply {
-                        isClickable = true
-                        setOnClickListener { openTagTab() }
-                    },
-                )
-            },
-        )
-    }
-
-    /** 跳到主界面的「标签」标签页（标签管理已经与模板同级，不再是独立页面）。 */
-    private fun openTagTab() {
-        startActivity(
-            Intent(this, SparkSettingsActivity::class.java)
-                .putExtra(SparkSettingsActivity.EXTRA_TAB, SparkSettingsActivity.TAB_TAG),
-        )
     }
 
     /** 会话标签的小药丸：点一下开 / 关（选了用强调色，没选用灰）。 */
