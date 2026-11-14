@@ -1,0 +1,18 @@
+﻿# 构建产物
+src/local.properties
+src/.gradle/
+src/build/
+src/app/build/
+src/.idea/
+*.apk
+!release/douyinspark-cc.apk
+
+# 签名密钥（绝不入库）
+keystore/
+*.keystore
+*.jks
+*.p12
+
+# 临时
+.tmp/
+*.log

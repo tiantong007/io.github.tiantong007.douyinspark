@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 会话头像：优先从 CDN 拉取，失败则用本地缓存 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:description="@string/spark_description"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/spark_name">
+
+        <!-- 配置跨进程通道：管理界面（模块进程）写，宿主（抖音进程）读 -->
+        <provider
+            android:name=".app.provider.ConfigProvider"
+            android:authorities="io.github.tiantong007.douyinspark.config"
+            android:exported="true" />
+
+        <!-- 宿主写配置前先唤醒本模块进程（见 WakeReceiver 注释），否则 provider 调不通 -->
+        <receiver
+            android:name=".app.provider.WakeReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.worldmargin.autospark.action.WAKE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 续火花管理界面：桌面图标入口 + 抖音设置页注入入口（由抖音进程唤起，故需 exported） -->
+        <activity
+            android:name=".app.ui.settings.SparkSettingsActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:label="@string/spark_name"
+            android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".app.ui.template.TemplateEditActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- 模板变量：一行一个（名字 + 两三行高的小 Monaco），结果回传给模板编辑页 -->
+        <activity
+            android:name=".app.ui.variable.VariableListActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".app.ui.conversation.ConversationEditActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- 会话选择页：搜索（含标签）+ 标签筛选 + 多选 -->
+        <activity
+            android:name=".app.ui.conversation.ConversationPickerActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".app.ui.macro.SandboxVarsActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".app.ui.macro.MacroEditActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".app.ui.function.FunctionEditActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".app.ui.settings.DocsActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar"
+            android:windowSoftInputMode="adjustResize" />
+    </application>
+</manifest>

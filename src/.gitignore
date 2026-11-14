@@ -1,0 +1,28 @@
+*.iml
+.DS_Store
+.gradle
+.kotlin
+/.idea
+/captures
+/local.properties
+build
+
+# 本地工作笔记，不入库
+research/
+NOTES.md
+
+# 发布签名密钥，不入库
+app/doumcp-release.jks
+
+# 签名密钥与配置，不入库
+*.jks
+*.keystore
+release-signing.properties
+
+# ������־����ʱĿ¼
+build_log*.txt
+tmp/
+build_status.txt
+
+# App \u5185\u7684\u4f7f\u7528\u6587\u6863\u7531\u6784\u5efa\u4ece docs/manual.md \u751f\u6210
+app/src/main/assets/docs/manual.md
