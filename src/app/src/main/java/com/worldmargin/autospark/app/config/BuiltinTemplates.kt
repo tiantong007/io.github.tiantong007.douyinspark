@@ -43,20 +43,17 @@ object BuiltinTemplates {
         BuiltinTemplate(
             id = "greeting",
             name = "通用问候",
-            desc = "按时段问候 + 火花天数 + 简短提醒，随机组合",
+            desc = "两句随机：提醒续火花 + 报火花天数",
             body =
                 """var who = ctx.io.name || "朋友";
-var hour = parseInt(ctx.builtin.time.split(":")[0], 10);
-var hi = hour < 5 ? "夜深了" : hour < 11 ? "早安" : hour < 14 ? "午安" : hour < 18 ? "下午好" : hour < 23 ? "晚上好" : "夜深了";
 ctx.result.push(ctx.builtin.pick([
-  hi + "～" + who + "，今天也要记得续火花哦",
-  "火花打卡 " + ctx.builtin.date + "：" + who + "，已经 " + ctx.io.days + " 天啦",
-  "滴——" + who + "，第 " + ctx.io.days + " 天的火花，别让它灭了",
-  who + "，今天也来续一下火花吧"
+  who + "，今天也来续一下火花吧",
+  "火花 " + ctx.io.days + " 天啦，" + who + " 别断～"
 ]));""",
         )
 
-    val ALL = listOf(BLANK, SPARK_STICKER, GREETING)
+    /** cc 版：模板页不再展示「空白模板」（它作为「不跟随任何模板」的状态标识保留）。 */
+    val ALL = listOf(SPARK_STICKER, GREETING)
 
     fun byId(id: String): BuiltinTemplate? = ALL.firstOrNull { it.id == id }
 }

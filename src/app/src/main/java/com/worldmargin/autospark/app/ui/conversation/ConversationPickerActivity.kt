@@ -393,7 +393,7 @@ class ConversationPickerActivity : Activity() {
                 .map { config.inheritKey(it.conversationId) }
                 .distinct()
         if (sources.size > 1) {
-            sourcesHost.addView(chip("全部来源", sourceFilter == null) {
+            sourcesHost.addView(chip("所有模板", sourceFilter == null) {
                 sourceFilter = null
                 refreshChips()
                 refreshList()

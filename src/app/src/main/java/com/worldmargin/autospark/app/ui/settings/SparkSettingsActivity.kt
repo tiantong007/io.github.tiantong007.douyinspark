@@ -601,7 +601,7 @@ class SparkSettingsActivity : Activity() {
                 body.addView(infoCard("待发", toSend.toString()))
                 body.addView(infoCard("待对方回复", waitingReply.toString()))
                 body.addView(infoCard("待重燃", renewal.count { it.state == SPARK_RECOVER }.toString()))
-                body.addView(infoCard("今日已续", conversations.count { it.state == SPARK_DONE }.toString()))
+                body.addView(infoCard("今日已燃", conversations.count { it.state == SPARK_DONE }.toString()))
                 body.addView(infoCard("未燃会话", config.selectedIds().size.toString()))
                 body.addView(
                     infoCard(
@@ -1846,14 +1846,19 @@ class SparkSettingsActivity : Activity() {
             )
             addView(
                 row().apply {
-                    addView(
-                        iconButton(UiKit.Icons.ADD, "移入未燃", primary = true, compact = true) { moveSelection(true) }
-                            .apply { layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f) },
-                    )
-                    addView(
-                        iconButton(UiKit.Icons.REMOVE, "移出到已燃", compact = true) { moveSelection(false) }
-                            .apply { layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f) },
-                    )
+                    // 按钮跟着页面走：未燃页只能移出、已燃页只能移入、全部页两种都可能
+                    if (sparkPage != PAGE_SELECTED) {
+                        addView(
+                            iconButton(UiKit.Icons.ADD, "移入未燃", primary = true, compact = true) { moveSelection(true) }
+                                .apply { layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f) },
+                        )
+                    }
+                    if (sparkPage != PAGE_UNSELECTED) {
+                        addView(
+                            iconButton(UiKit.Icons.REMOVE, "移出未燃", compact = true) { moveSelection(false) }
+                                .apply { layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f) },
+                        )
+                    }
                 },
             )
             selectionBar = this
@@ -1895,7 +1900,7 @@ class SparkSettingsActivity : Activity() {
         return when {
             // 没有火苗时抖音可能给一句引导文案（互为好友但还没建立火苗 → 「可点亮」）
             !snapshot.hasSpark -> snapshot.stateText.takeIf { it.isNotBlank() } ?: "无火花"
-            snapshot.state == SPARK_DONE -> "火花 ${snapshot.days} 天 · 今日已续"
+            snapshot.state == SPARK_DONE -> "火花 ${snapshot.days} 天 · 今日已燃"
             snapshot.state == SPARK_PENDING ->
                 if (sentToday) {
                     "火花 ${snapshot.days} 天 · 今日已发"
@@ -2131,7 +2136,7 @@ class SparkSettingsActivity : Activity() {
                         val extra =
                             column().apply {
                                 visibility = if (expanded) View.VISIBLE else View.GONE
-                                buildChildren(config, id, this)
+                                // cc 版：动作按钮在派生列表**上方**
                                 if (builtin.body.isNotBlank()) {
                                     // 三个入口分两行，窄屏下「克隆到会话」不会被挤成竖排
                                     val addButton =
@@ -2173,6 +2178,7 @@ class SparkSettingsActivity : Activity() {
                                         },
                                     )
                                 }
+                                buildChildren(config, id, this)
                             }
                         addView(extra)
                         templateFolds[id] = extra to glyph
@@ -2237,15 +2243,16 @@ class SparkSettingsActivity : Activity() {
                             val extra =
                                 column().apply {
                                     visibility = if (expanded) View.VISIBLE else View.GONE
-                                    buildChildren(config, group.id, this)
+                                    // cc 版：动作按钮在派生列表**上方**
                                     addView(
                                         row().apply {
-                                            setPadding(0, dp(8), 0, 0)
+                                            setPadding(0, dp(8), 0, dp(4))
                                             addView(iconButton(UiKit.Icons.EDIT, "编辑模板", primary = true, compact = true) { openTemplateEditor(group.id) })
                                             addView(iconButton(UiKit.Icons.PERSON_ADD, "选会话继承", compact = true) { pickMembers(group.id, group.name) })
                                             addView(iconButton(UiKit.Icons.CLONE, "克隆到会话", compact = true) { cloneBodyToConversations(group.name, group.body) })
                                         },
                                     )
+                                    buildChildren(config, group.id, this)
                                 }
                             addView(extra)
                             templateFolds[group.id] = extra to glyph
@@ -3877,7 +3884,7 @@ class SparkSettingsActivity : Activity() {
 
         body.addView(sectionTitle("更多"))
         body.addView(
-            menuRow(UiKit.Icons.GRAPH, "概览", "会话数、今日已续 / 待续 / 待重燃、今日已发") {
+            menuRow(UiKit.Icons.GRAPH, "概览", "会话数、今日已燃 / 待续 / 待重燃、今日已发") {
                 openSubPage(SUB_OVERVIEW)
             },
         )
