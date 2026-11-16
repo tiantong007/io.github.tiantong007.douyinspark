@@ -176,14 +176,15 @@ class ConversationPickerActivity : Activity() {
                 .filter { !it.isHidden }
                 .filter { !onlySingle || !it.isGroup }
                 .filter {
-                    // 与「续火花」页口径保持一致：
-                    //   未燃 = 需要续（含手动移入的无火花会话）
+                    // 与「续火花」页口径保持一致（三页都不含「无火花」的会话）：
+                    //   未燃 = 需要续（含手动移入的无火花会话，所以这里不能限定 hasSpark）
                     //   已燃 = 有火花且今天已互动
-                    //   全部 = 所有未隐藏（含无火花，这里是「选会话」的场景，需要能选到它们）
+                    //   全部 = 有火花的所有会话
+                    // 无火花的会话去「续火花 → 全部」页底部的「无火花」卡片里操作
                     when (selectedFilter) {
                         1 -> config.needsRenewal(it)
                         2 -> it.hasSpark && !config.needsRenewal(it)
-                        else -> true
+                        else -> it.hasSpark || config.needsRenewal(it)
                     }
                 }
                 .filter { snapshot ->

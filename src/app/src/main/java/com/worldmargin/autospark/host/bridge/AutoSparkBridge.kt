@@ -938,7 +938,14 @@ object AutoSparkBridge {
         }
         HostTrace.add(context, "待续 ${candidates.size} 个")
         if (candidates.isEmpty()) {
-            com.worldmargin.autospark.core.DouToastHelper.show(context, "（今日已无需发送）")
+            val sentTodayCount = config.sentDays.count { it.value == today }
+            val hint =
+                if (sentTodayCount > 0) {
+                    "（今日已完成：已发 $sentTodayCount 个）"
+                } else {
+                    "（今天没有需要续火花的会话）"
+                }
+            com.worldmargin.autospark.core.DouToastHelper.show(context, hint)
             return JSONObject()
                 .put("ok", true)
                 .put("today", today)
@@ -958,14 +965,17 @@ object AutoSparkBridge {
                     spark.optInt("state", -1) in 2..3
             }
         val toSend = candidates.count { config.sentDays[it.optString("conversationId")] != today }
-        val pendingHint =
-            if (waitingReply == 0) {
-                "（有 $toSend 个待发）"
-            } else {
-                "（待发 $toSend 个 · 待对方回复 $waitingReply 个）"
-            }
         HostTrace.add(context, "待发 $toSend 个，待对方回复 $waitingReply 个")
-        com.worldmargin.autospark.core.DouToastHelper.show(context, pendingHint)
+        // 只有真的有东西要发/在等，才弹提示；否则静默（结果提示会覆盖）
+        if (toSend > 0 || waitingReply > 0) {
+            val pendingHint =
+                if (waitingReply == 0) {
+                    "（待发 $toSend 个）"
+                } else {
+                    "（待发 $toSend 个 · 待对方回复 $waitingReply 个）"
+                }
+            com.worldmargin.autospark.core.DouToastHelper.show(context, pendingHint)
+        }
 
         // 第二遍：真正发送
         // 同一轮里同一个会话只发一次：IM 列表万一返回重复项，也不会发两条
@@ -1069,12 +1079,20 @@ object AutoSparkBridge {
 
         applyScriptMutations(context, config, pendingSandbox, pendingSandboxDeletes, macroOps)
         val skippedCount = skipped.length()
-        com.worldmargin.autospark.core.DouToastHelper.show(
-            context,
-            "（抖音续火花cc：已发 ${sent.length()} 个" +
-                (if (skippedCount > 0) "，跳过 $skippedCount 个" else "") +
-                "，失败 ${failed.length()} 个）",
-        )
+        val sentCount = sent.length()
+        val failedCount = failed.length()
+        // 结果提示分三种：真的发了 / 全是今天已发（对方没回） / 什么都没发生
+        val text =
+            when {
+                sentCount > 0 ->
+                    "（抖音续火花cc：已发 $sentCount 个" +
+                        (if (skippedCount > 0) "，跳过 $skippedCount 个" else "") +
+                        (if (failedCount > 0) "，失败 $failedCount 个" else "") + "）"
+                failedCount > 0 -> "（抖音续火花cc：$failedCount 个发送失败，其余今天已发）"
+                skippedCount > 0 -> "（今天这 $skippedCount 个都发过了，等对方回）"
+                else -> "（今天没有需要续火花的会话）"
+            }
+        com.worldmargin.autospark.core.DouToastHelper.show(context, text)
 
         return JSONObject()
             .put("ok", true)
@@ -1091,7 +1109,6 @@ object AutoSparkBridge {
             {
                 wakeModule(context)
                 HostTrace.start(context, "已安排：探测 IM 就绪，就绪即发送")
-                com.worldmargin.autospark.core.DouToastHelper.show(context, "（抖音续火花cc：正在检测火花状态）")
                 runCatching {
                     Thread.sleep(START_DELAY_MS)
                     // 冷启动时 IM 可能还没就绪，会话列表取不到就退避重试

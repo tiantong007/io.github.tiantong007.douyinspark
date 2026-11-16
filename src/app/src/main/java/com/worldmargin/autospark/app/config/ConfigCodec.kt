@@ -28,6 +28,9 @@ object ConfigCodec {
     private const val KEY_GUIDE_DISMISSED = "guideDismissed"
     private const val KEY_GUIDE_SEARCHED = "guideSearched"
     private const val KEY_GUIDE_SHARED = "guideShared"
+    private const val KEY_ALARM_HOUR = "alarmHour"
+    private const val KEY_ALARM_MINUTE = "alarmMinute"
+    private const val KEY_ALARM_ASKED = "alarmAsked"
     private const val KEY_MACROS = "macros"
     private const val KEY_FUNCTIONS = "functions"
     private const val KEY_TAGS = "tags"
@@ -201,6 +204,9 @@ object ConfigCodec {
             .put(KEY_GUIDE_DISMISSED, config.guideDismissed)
             .put(KEY_GUIDE_SEARCHED, config.guideSearched)
             .put(KEY_GUIDE_SHARED, config.guideShared)
+            .put(KEY_ALARM_HOUR, config.alarmHour)
+            .put(KEY_ALARM_MINUTE, config.alarmMinute)
+            .put(KEY_ALARM_ASKED, config.alarmAsked)
             .toString()
     }
 
@@ -375,6 +381,9 @@ object ConfigCodec {
             guideDismissed = root.optBoolean(KEY_GUIDE_DISMISSED),
             guideSearched = root.optBoolean(KEY_GUIDE_SEARCHED),
             guideShared = root.optBoolean(KEY_GUIDE_SHARED),
+            alarmHour = root.optInt(KEY_ALARM_HOUR, -1),
+            alarmMinute = root.optInt(KEY_ALARM_MINUTE, 0),
+            alarmAsked = root.optBoolean(KEY_ALARM_ASKED),
         )
     }
 

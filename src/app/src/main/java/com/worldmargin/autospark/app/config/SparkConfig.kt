@@ -47,6 +47,17 @@ data class SparkConfig(
     val guideSearched: Boolean = false,
     /** 引导用：是否用过文档的复制 / 导出 / 分享。 */
     val guideShared: Boolean = false,
+    /**
+     * 定时唤醒：每天到这个钟点自动打开抖音（0~23，-1 = 关闭）。
+     *
+     * 模块本身跑在抖音进程里，抖音不启动就没有任何代码在跑，所以「锁屏也能发」必须靠
+     * AlarmManager 把抖音拉起来。见 [com.worldmargin.autospark.app.alarm.DailyAlarm]。
+     */
+    val alarmHour: Int = -1,
+    /** 定时唤醒的分（0~59）。 */
+    val alarmMinute: Int = 0,
+    /** 定时唤醒是否已经拿到「后台弹出界面 / 精确闹钟」等权限（只用于界面提示，不拦功能）。 */
+    val alarmAsked: Boolean = false,
 ) {
     fun group(id: String?): TemplateGroup? = groups.firstOrNull { it.id == id }
 

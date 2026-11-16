@@ -4,6 +4,16 @@
     <!-- 会话头像：优先从 CDN 拉取，失败则用本地缓存 -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- 定时唤醒：到点拉起抖音。精确闹钟（Android 12+ 需单独授权，未授权时自动退化） -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- 定时唤醒：重启后重排闹钟（否则关机一次就再也不响了） -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- 定时唤醒：Android 10+ 后台启动 Activity 需要「悬浮窗」权限才放行 -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- 定时唤醒：点亮屏幕（部分 ROM 上后台 Activity 需要） -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <application
         android:description="@string/spark_description"
         android:icon="@mipmap/ic_launcher"
@@ -15,7 +25,7 @@
             android:authorities="io.github.tiantong007.douyinspark.config"
             android:exported="true" />
 
-        <!-- 宿主写配置前先唤醒本模块进程（见 WakeReceiver 注释），否则 provider 调不通 -->
+        <!-- 宿主写配置前先唤醒本模块进程（见 WakeReceiver 注释），否则 provider 调不到 -->
         <receiver
             android:name=".app.provider.WakeReceiver"
             android:exported="true">
@@ -24,7 +34,18 @@
             </intent-filter>
         </receiver>
 
-        <!-- 续火花管理界面：桌面图标入口 + 抖音设置页注入入口（由抖音进程唤起，故需 exported） -->
+        <!-- 定时唤醒：AlarmManager 到点叫醒本进程，拉起抖音并重排下一天 -->
+        <receiver
+            android:name=".app.alarm.AlarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.worldmargin.autospark.action.DAILY_ALARM" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 续火花管理界面：桌面图标入口 + 抖音设置页注入口（由抖音进程唤起，故需 exported） -->
         <activity
             android:name=".app.ui.settings.SparkSettingsActivity"
             android:exported="true"
@@ -56,7 +77,7 @@
             android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar"
             android:windowSoftInputMode="adjustResize" />
 
-        <!-- 会话选择页：搜索（含标签）+ 标签筛选 + 多选 -->
+        <!-- 会话选择页：搜索 + 三页筛选 + 多选 -->
         <activity
             android:name=".app.ui.conversation.ConversationPickerActivity"
             android:exported="false"

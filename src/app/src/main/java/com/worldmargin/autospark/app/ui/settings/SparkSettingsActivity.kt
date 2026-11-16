@@ -29,6 +29,7 @@ import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import kotlin.math.abs
+import com.worldmargin.autospark.app.alarm.DailyAlarm
 import com.worldmargin.autospark.app.config.BuiltinTemplate
 import com.worldmargin.autospark.app.config.BuiltinTemplates
 import com.worldmargin.autospark.app.config.model.ConversationSnapshot
@@ -284,6 +285,11 @@ class SparkSettingsActivity : Activity() {
     }
 
     override fun onResume() {
+        // 每次回到前台重排一次闹钟：改过时间、重启过、被 ROM 清掉都能自愈
+        runCatching {
+            val config = ConfigStore.load(this)
+            if (config.alarmHour in 0..23) DailyAlarm.schedule(this, config.alarmHour, config.alarmMinute)
+        }
         super.onResume()
         registerSnapshotReceiver()
         render()
@@ -641,6 +647,7 @@ class SparkSettingsActivity : Activity() {
             }
 
             SUB_HOST -> {
+
                 body.addView(
                     card().apply {
                         addView(
@@ -655,6 +662,8 @@ class SparkSettingsActivity : Activity() {
                     },
                 )
             }
+
+            SUB_ALARM -> buildAlarmPage(config, body)
 
             SUB_GUIDE -> {
                 val basic = basicSteps(config)
@@ -2950,6 +2959,248 @@ class SparkSettingsActivity : Activity() {
         }
     }
 
+    // ------------------------------------------------------------------ 定时唤醒
+
+    /**
+     * 定时唤醒页。
+     *
+     * 模块跑在抖音进程里，抖音不启动就没有任何代码在跑 —— 这是「锁屏也能自动发」的唯一障碍。
+     * 这里用 AlarmManager 每天到点把抖音拉起来，剩下的交给宿主侧的
+     * [com.worldmargin.autospark.host.bridge.AutoSparkBridge.scheduleOnAppStart]。
+     */
+    private fun buildAlarmPage(
+        config: SparkConfig,
+        body: LinearLayout,
+    ) {
+        val enabled = config.alarmHour in 0..23
+        val at = if (enabled) DailyAlarm.nextTriggerAt(config.alarmHour, config.alarmMinute) else 0L
+
+        body.addView(
+            card().apply {
+                addView(text("定时唤醒", 16f, bold = true))
+                addView(
+                    text(
+                        "模块跑在抖音进程里，抖音不启动就不会有任何动作。" +
+                            "打开这里的开关后，每天到点由系统把抖音拉起来，模块随后自动扫一轮并发送。",
+                        12f,
+                        COLOR_DIM,
+                    ),
+                )
+            },
+        )
+
+        body.addView(
+            card().apply {
+                addView(
+                    switchRow(
+                        "每天定时打开抖音",
+                        if (enabled) "下次：${formatClock(at)}" else "关闭时完全不动系统闹钟",
+                        enabled,
+                    ) { on ->
+                        if (on) {
+                            pickTime(config.alarmHour.takeIf { it in 0..23 } ?: DEFAULT_ALARM_HOUR, config.alarmMinute) { hour, minute ->
+                                ConfigStore.update(this@SparkSettingsActivity) {
+                                    it.copy(alarmHour = hour, alarmMinute = minute, alarmAsked = true)
+                                }
+                                DailyAlarm.schedule(this@SparkSettingsActivity, hour, minute)
+                                render()
+                                requestAlarmPermissions()
+                            }
+                        } else {
+                            ConfigStore.update(this@SparkSettingsActivity) { it.copy(alarmHour = -1) }
+                            DailyAlarm.cancel(this@SparkSettingsActivity)
+                            render()
+                        }
+                    },
+                )
+                if (enabled) {
+                    addView(divider())
+                    addView(
+                        menuRow(
+                            UiKit.Icons.REFRESH,
+                            "修改时间",
+                            "%02d:%02d".format(config.alarmHour, config.alarmMinute),
+                        ) {
+                            pickTime(config.alarmHour, config.alarmMinute) { hour, minute ->
+                                ConfigStore.update(this@SparkSettingsActivity) {
+                                    it.copy(alarmHour = hour, alarmMinute = minute)
+                                }
+                                DailyAlarm.schedule(this@SparkSettingsActivity, hour, minute)
+                                render()
+                            }
+                        },
+                    )
+                }
+            },
+        )
+
+        body.addView(sectionTitle("权限"))
+        body.addView(
+            card().apply {
+                val overlay = DailyAlarm.canStartFromBackground(this@SparkSettingsActivity)
+                val exact = DailyAlarm.canScheduleExact(this@SparkSettingsActivity)
+                addView(
+                    menuRow(
+                        if (overlay) UiKit.Icons.CHECK else UiKit.Icons.CLOSE,
+                        "后台弹出界面（悬浮窗）",
+                        if (overlay) "已授权" else "未授权：Android 10+ 会拦住后台启动抖音，必须开",
+                    ) {
+                        if (!overlay) openOverlaySettings()
+                    },
+                )
+                addView(
+                    menuRow(
+                        if (exact) UiKit.Icons.CHECK else UiKit.Icons.CLOSE,
+                        "精确闹钟",
+                        if (exact) "已授权" else "未授权：仍会响，但可能晚十几分钟（够用）",
+                    ) {
+                        if (!exact) openExactAlarmSettings()
+                    },
+                )
+                addView(
+                    menuRow(UiKit.Icons.SERVER, "电池优化", "把本模块设为「不限制」，否则部分 ROM 会压掉闹钟") {
+                        openBatterySettings()
+                    },
+                )
+            },
+        )
+
+        body.addView(sectionTitle("说明"))
+        body.addView(
+            card().apply {
+                addView(
+                    text(
+                        "1. 到点后系统拉起抖音，抖音进程启动 → 模块注入 → 扫描 → 发送。" +
+                            "发送不需要亮屏，也不需要解锁。\n" +
+                            "2. 抖音启动后会自动停在自己的界面。想让它发完就退回后台，" +
+                            "在系统「应用 → 抖音 → 权限」里关掉「显示在其他应用上层」以外的悬浮窗类权限，或用 MIUI 自动任务追加一步返回桌面。\n" +
+                            "3. 手机重启后闹钟会自动重排（已申请开机广播）。\n" +
+                            "4. 总开关关闭时，定时唤醒只会扫描不会发送。",
+                        12f,
+                        COLOR_DIM,
+                    ),
+                )
+            },
+        )
+    }
+
+    /** 时 / 分选择：两个滚轮太丑，这里用两个数字输入 + 常用时间快捷键。 */
+    private fun pickTime(
+        hour: Int,
+        minute: Int,
+        onPick: (Int, Int) -> Unit,
+    ) {
+        val box = column().apply { setPadding(dp(20), dp(8), dp(20), 0) }
+        val hourInput =
+            EditText(this).apply {
+                inputType = InputType.TYPE_CLASS_NUMBER
+                setText(hour.coerceIn(0, 23).toString())
+                textSize = 18f
+                setTextColor(COLOR_TEXT)
+                hint = "小时 0-23"
+            }
+        val minuteInput =
+            EditText(this).apply {
+                inputType = InputType.TYPE_CLASS_NUMBER
+                setText(minute.coerceIn(0, 59).toString())
+                textSize = 18f
+                setTextColor(COLOR_TEXT)
+                hint = "分钟 0-59"
+            }
+        box.addView(hourInput)
+        box.addView(minuteInput)
+        box.addView(
+            text("常用：", 12f, COLOR_DIM).apply { setPadding(0, dp(10), 0, dp(4)) },
+        )
+        box.addView(
+            row().apply {
+                listOf(0 to 5, 8 to 0, 12 to 0, 23 to 30).forEach { (h, m) ->
+                    addView(
+                        iconButton(UiKit.Icons.PLAY, "%02d:%02d".format(h, m), compact = true) {
+                            hourInput.setText(h.toString())
+                            minuteInput.setText(m.toString())
+                        },
+                    )
+                }
+            },
+        )
+        AlertDialog
+            .Builder(this)
+            .setTitle("每天几点打开抖音")
+            .setView(box)
+            .setPositiveButton("确定") { _, _ ->
+                val h = hourInput.text.toString().toIntOrNull()?.coerceIn(0, 23) ?: hour
+                val m = minuteInput.text.toString().toIntOrNull()?.coerceIn(0, 59) ?: minute
+                onPick(h, m)
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun formatClock(at: Long): String =
+        if (at <= 0L) "未安排" else SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(at))
+
+    /** 申请悬浮窗 + 精确闹钟 + 忽略电池优化（三个都拿不到也能用，只是可能被系统压）。 */
+    private fun requestAlarmPermissions() {
+        if (!DailyAlarm.canStartFromBackground(this)) {
+            AlertDialog
+                .Builder(this)
+                .setTitle("还需要「后台弹出界面」权限")
+                .setMessage(
+                    "Android 10 起禁止应用在后台启动界面。要让闹钟真的把抖音拉起来，" +
+                        "必须给本模块「显示在其他应用上层」（悬浮窗）权限。\n\n" +
+                        "点「去开启」跳到系统设置，找到「抖音续火花cc」打开即可。",
+                )
+                .setPositiveButton("去开启") { _, _ -> openOverlaySettings() }
+                .setNegativeButton("稍后", null)
+                .show()
+        } else if (!DailyAlarm.canScheduleExact(this)) {
+            openExactAlarmSettings()
+        }
+    }
+
+    private fun openOverlaySettings() {
+        val ok =
+            runCatching {
+                startActivity(
+                    Intent(
+                        android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        android.net.Uri.parse("package:$packageName"),
+                    ),
+                )
+            }.isSuccess
+        if (!ok) {
+            runCatching { startActivity(Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION)) }
+        }
+    }
+
+    private fun openExactAlarmSettings() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        val ok =
+            runCatching {
+                startActivity(
+                    Intent(
+                        android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                        android.net.Uri.parse("package:$packageName"),
+                    ),
+                )
+            }.isSuccess
+        if (!ok) runCatching { startActivity(Intent(android.provider.Settings.ACTION_SETTINGS)) }
+    }
+
+    private fun openBatterySettings() {
+        val ok =
+            runCatching {
+                startActivity(
+                    Intent(
+                        android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                        android.net.Uri.parse("package:$packageName"),
+                    ),
+                )
+            }.isSuccess
+        if (!ok) runCatching { startActivity(Intent(android.provider.Settings.ACTION_SETTINGS)) }
+    }
+
     /** 导出页：逐项勾选要带走的内容。 */
     private fun buildExportPage(
         config: SparkConfig,
@@ -3454,6 +3705,11 @@ class SparkSettingsActivity : Activity() {
             },
         )
         body.addView(
+            menuRow(UiKit.Icons.ZAP, "定时唤醒", alarmSummary(config)) {
+                openSubPage(SUB_ALARM)
+            },
+        )
+        body.addView(
             menuRow(UiKit.Icons.SERVER, "宿主状态", hostSummary(config)) {
                 openSubPage(SUB_HOST)
             },
@@ -3494,6 +3750,14 @@ class SparkSettingsActivity : Activity() {
         } else {
             "手动移入 ${config.forcedRenew.size} 个 / 移出 ${config.forcedSkip.size} 个"
         }
+
+    private fun alarmSummary(config: SparkConfig): String {
+        if (config.alarmHour !in 0..23) return "关闭"
+        val at = DailyAlarm.nextTriggerAt(config.alarmHour, config.alarmMinute)
+        val clock = "%02d:%02d".format(config.alarmHour, config.alarmMinute)
+        val overlay = if (DailyAlarm.canStartFromBackground(this)) "" else " · 缺悬浮窗权限"
+        return "每天 $clock · 下次 ${formatClock(at)}$overlay"
+    }
 
     private fun hostSummary(config: SparkConfig): String =
         if (config.hostNoteAt == 0L) {
@@ -3555,6 +3819,7 @@ class SparkSettingsActivity : Activity() {
                 SUB_IMPORT to "导入配置",
                 SUB_HOST to "宿主状态",
                 SUB_GUIDE to "新手引导",
+                SUB_ALARM to "定时唤醒",
                 SUB_ABOUT to "关于",
             )
 
@@ -3579,6 +3844,7 @@ class SparkSettingsActivity : Activity() {
         const val SUB_HOST = "host"
         const val SUB_GUIDE = "guide"
         const val SUB_ABOUT = "about"
+        const val SUB_ALARM = "alarm"
 
         /** 手动发送等回执的超时（抖音没运行时不至于一直等）。 */
         const val SEND_TIMEOUT_MS = 12_000L
@@ -3591,6 +3857,9 @@ class SparkSettingsActivity : Activity() {
 
         /** 抖音冷启动后等它把模块装载好的时间。 */
         const val HOST_BOOT_WAIT_MS = 4_000L
+
+        /** 定时唤醒默认时间（08:00）：第一次打开开关时预填。 */
+        const val DEFAULT_ALARM_HOUR = 8
 
         const val DOUYIN_PACKAGE = "com.ss.android.ugc.aweme"
 
