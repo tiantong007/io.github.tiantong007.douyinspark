@@ -1,6 +1,6 @@
 package com.worldmargin.autospark.app.script
 
-import com.worldmargin.autospark.app.config.TemplateVar
+import com.worldmargin.autospark.app.config.model.TemplateVar
 
 /**
  * 模板变量的求值前导。

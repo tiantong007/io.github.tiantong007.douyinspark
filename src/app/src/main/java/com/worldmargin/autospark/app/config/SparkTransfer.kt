@@ -1,5 +1,7 @@
 package com.worldmargin.autospark.app.config
 
+import com.worldmargin.autospark.app.config.model.MacroScript
+
 /**
  * 配置的按项导出 / 导入。
  *

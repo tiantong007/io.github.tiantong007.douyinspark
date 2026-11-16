@@ -1,6 +1,6 @@
 package com.worldmargin.autospark.app.script
 
-import com.worldmargin.autospark.app.config.SandboxVar
+import com.worldmargin.autospark.app.config.model.SandboxVar
 import com.worldmargin.autospark.core.ModLog
 import org.json.JSONObject
 import org.mozilla.javascript.ClassShutter

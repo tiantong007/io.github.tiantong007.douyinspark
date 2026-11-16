@@ -11,16 +11,16 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import com.worldmargin.autospark.app.config.ConfigCodec
-import com.worldmargin.autospark.app.config.SyncMode
-import com.worldmargin.autospark.app.config.TemplateGroup
+import com.worldmargin.autospark.app.config.model.SyncMode
+import com.worldmargin.autospark.app.config.model.TemplateGroup
 import com.worldmargin.autospark.app.config.TemplateOps
-import com.worldmargin.autospark.app.config.TemplateVar
+import com.worldmargin.autospark.app.config.model.TemplateVar
 import com.worldmargin.autospark.app.script.SparkScriptEngine
 import com.worldmargin.autospark.app.script.PreviewData
 import com.worldmargin.autospark.app.script.TemplateVarPrelude
 import com.worldmargin.autospark.app.config.ConfigStore
 import com.worldmargin.autospark.app.ui.conversation.ConversationPickerActivity
-import com.worldmargin.autospark.app.config.ConversationTemplate
+import com.worldmargin.autospark.app.config.model.ConversationTemplate
 import com.worldmargin.autospark.app.ui.common.UiKit.asClickable
 import com.worldmargin.autospark.app.ui.common.UiKit.actionRow
 import com.worldmargin.autospark.app.ui.common.UiKit.column
@@ -37,7 +37,6 @@ import com.worldmargin.autospark.app.ui.common.UiKit.titleBar
 import java.util.UUID
 import com.worldmargin.autospark.app.editor.SparkEditor
 import com.worldmargin.autospark.app.editor.SparkEditors
-import com.worldmargin.autospark.app.ui.macro.MacroPicker
 import com.worldmargin.autospark.app.ui.settings.SparkPreview
 import com.worldmargin.autospark.app.ui.variable.VariableListActivity
 import com.worldmargin.autospark.app.ui.common.UiKit
@@ -106,7 +105,6 @@ class TemplateEditActivity : Activity() {
                 addView(pasteButton(editor))
                 addView(iconButton(UiKit.Icons.WAND, "", compact = true, hint = "格式化") { editor.format() })
                 if (existed) {
-                    addView(iconButton(UiKit.Icons.PLUG, "", compact = true, hint = "挂载宏") { pickMacros() })
                     addView(iconButton(UiKit.Icons.PERSON_ADD, "", compact = true, hint = "继承会话") { pickMembers() })
                     addView(iconButton(UiKit.Icons.TRASH, "", compact = true, hint = "删除") { confirmDelete() })
                 }
@@ -195,14 +193,6 @@ class TemplateEditActivity : Activity() {
 
     /** 当前变量（变量页回来时已经合并好，这里直接用）。 */
     private fun collectVariables(): List<TemplateVar> = vars
-
-
-    /** 勾选挂在本模板上的宏（宏在模板脚本之后执行）。 */
-    private fun pickMacros() {
-        val id = groupId ?: return
-        val name = nameField.text.toString().ifBlank { "本模板" }
-        MacroPicker.show(this, id, name) { }
-    }
 
     private fun showPreview() {
         val config = ConfigStore.load(this)

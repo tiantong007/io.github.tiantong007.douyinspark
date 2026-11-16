@@ -11,7 +11,7 @@ import android.view.View
 import android.widget.EditText
 import android.widget.FrameLayout
 import com.worldmargin.autospark.app.config.SparkConfig
-import com.worldmargin.autospark.app.config.TemplateVar
+import com.worldmargin.autospark.app.config.model.TemplateVar
 
 /**
  * 脚本编辑器接口。

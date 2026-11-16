@@ -10,7 +10,7 @@ import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.worldmargin.autospark.app.config.ConfigStore
-import com.worldmargin.autospark.app.config.ConversationSnapshot
+import com.worldmargin.autospark.app.config.model.ConversationSnapshot
 import com.worldmargin.autospark.app.config.SparkConfig
 import com.worldmargin.autospark.app.ui.common.UiKit
 import com.worldmargin.autospark.app.ui.common.UiKit.COLOR_ACCENT

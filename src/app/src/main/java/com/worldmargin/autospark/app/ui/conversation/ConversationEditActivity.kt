@@ -12,11 +12,11 @@ import android.widget.Toast
 import com.worldmargin.autospark.host.bridge.AutoSparkBridge
 import com.worldmargin.autospark.app.config.BuiltinTemplates
 import com.worldmargin.autospark.app.config.ConfigCodec
-import com.worldmargin.autospark.app.config.ConversationTemplate
+import com.worldmargin.autospark.app.config.model.ConversationTemplate
 import com.worldmargin.autospark.app.config.SparkConfig
 import com.worldmargin.autospark.app.config.TemplateOps
-import com.worldmargin.autospark.app.config.TemplateSource
-import com.worldmargin.autospark.app.config.TemplateVar
+import com.worldmargin.autospark.app.config.model.TemplateSource
+import com.worldmargin.autospark.app.config.model.TemplateVar
 import com.worldmargin.autospark.app.script.SparkScriptEngine
 import com.worldmargin.autospark.app.script.PreviewData
 import com.worldmargin.autospark.app.script.TemplateVarPrelude
@@ -48,7 +48,6 @@ import com.worldmargin.autospark.app.ui.common.UiKit.text
 import com.worldmargin.autospark.app.ui.common.UiKit.titleBar
 import com.worldmargin.autospark.app.editor.SparkEditor
 import com.worldmargin.autospark.app.editor.SparkEditors
-import com.worldmargin.autospark.app.ui.macro.MacroPicker
 import com.worldmargin.autospark.app.ui.settings.SparkPreview
 import com.worldmargin.autospark.app.ui.variable.VariableListActivity
 import com.worldmargin.autospark.app.ui.common.UiKit
@@ -413,7 +412,6 @@ class ConversationEditActivity : Activity() {
             addView(iconButton(UiKit.Icons.PREVIEW, "", compact = true, hint = "预览") { showPreview() })
             addView(pasteButton(editor))
             addView(iconButton(UiKit.Icons.WAND, "", compact = true, hint = "格式化") { editor.format() })
-            addView(iconButton(UiKit.Icons.PLUG, "", compact = true, hint = "挂载宏") { pickMacros() })
             // 这个会话自己的变量（同名会覆盖父模板的）：变量页
             addView(iconButton(UiKit.Icons.VARIABLE_GROUP, "", compact = true, hint = "本会话的变量") { openVariables() })
             val following = ConfigStore.load(this@ConversationEditActivity).conversation(conversationId)?.inheritFrom
@@ -424,12 +422,6 @@ class ConversationEditActivity : Activity() {
 
     /** 标题栏右侧的保存动作。 */
     private fun saveAction(): View = iconButton(UiKit.Icons.CHECK, "保存", primary = true, compact = true) { save() }
-
-    /** 勾选只挂在本会话上的宏。 */
-    private fun pickMacros() {
-        val label = ConfigStore.load(this).snapshots.firstOrNull { it.conversationId == conversationId }?.displayName ?: "本会话"
-        MacroPicker.show(this, conversationId, label) { renderInfo() }
-    }
 
     /**
      * 打开**本会话自己的**变量页。

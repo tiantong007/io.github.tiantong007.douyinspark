@@ -10,7 +10,7 @@ import com.worldmargin.autospark.core.HostRuntime
 import com.worldmargin.autospark.core.ModLog
 import com.worldmargin.autospark.host.account.AccountBridge
 import com.worldmargin.autospark.app.config.BuiltinTemplates
-import com.worldmargin.autospark.app.config.ConversationSnapshot
+import com.worldmargin.autospark.app.config.model.ConversationSnapshot
 import com.worldmargin.autospark.app.config.SparkConfig
 import com.worldmargin.autospark.app.config.ConfigClient
 import com.worldmargin.autospark.app.provider.ConfigContract
@@ -27,7 +27,7 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
-import com.worldmargin.autospark.app.config.SandboxVar
+import com.worldmargin.autospark.app.config.model.SandboxVar
 import com.worldmargin.autospark.app.script.TemplateVarPrelude
 import com.worldmargin.autospark.core.DouToastHelper
 
@@ -351,7 +351,7 @@ object AutoSparkBridge {
     private fun applyScriptMutations(
         context: Context,
         config: SparkConfig,
-        writes: List<com.worldmargin.autospark.app.config.SandboxVar>,
+        writes: List<com.worldmargin.autospark.app.config.model.SandboxVar>,
         deletes: List<Pair<String, String>>,
         macroOps: List<SparkScriptEngine.MacroOp>,
     ) {
@@ -910,7 +910,7 @@ object AutoSparkBridge {
         val skipped = JSONArray()
         val failed = JSONArray()
         // 脚本对沙盒与宏的改动：这一轮跑完再统一落盘
-        val pendingSandbox = mutableListOf<com.worldmargin.autospark.app.config.SandboxVar>()
+        val pendingSandbox = mutableListOf<com.worldmargin.autospark.app.config.model.SandboxVar>()
         val pendingSandboxDeletes = mutableListOf<Pair<String, String>>()
         val macroOps = mutableListOf<SparkScriptEngine.MacroOp>()
 

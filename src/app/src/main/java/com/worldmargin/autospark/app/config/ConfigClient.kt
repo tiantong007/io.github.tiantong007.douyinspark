@@ -4,7 +4,7 @@ import android.content.Context
 import android.os.Bundle
 import com.worldmargin.autospark.app.provider.ConfigContract
 import com.worldmargin.autospark.app.config.ConfigCodec
-import com.worldmargin.autospark.app.config.ConversationSnapshot
+import com.worldmargin.autospark.app.config.model.ConversationSnapshot
 import com.worldmargin.autospark.app.config.SparkConfig
 import com.worldmargin.autospark.app.provider.ConfigProvider
 

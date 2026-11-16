@@ -15,7 +15,7 @@ import android.widget.TextView
 import android.widget.Toast
 import com.worldmargin.autospark.app.config.ConfigCodec
 import com.worldmargin.autospark.app.config.SparkConfig
-import com.worldmargin.autospark.app.config.TemplateVar
+import com.worldmargin.autospark.app.config.model.TemplateVar
 import com.worldmargin.autospark.app.script.SparkScriptEngine
 import com.worldmargin.autospark.app.script.PreviewData
 import com.worldmargin.autospark.app.script.TemplateVarPrelude
