@@ -586,7 +586,7 @@ sdk.dir=C\:\\path\\to\\android-sdk
 
 ```
 README.md        本文件，也是 App 内「使用文档」的源（构建时同步进 assets）
-docs/            状态快照 / 构建签名 / 表情协议 / 已知坑 / 发布流程
+docs/            状态快照 / 构建签名 / 表情协议（含抓包样本）/ 已知坑 / 发布流程
 src/             源码
 keystore/        签名密钥（.gitignore 排除，不在仓库里）
 release/         构建产物
