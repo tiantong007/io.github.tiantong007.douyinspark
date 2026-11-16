@@ -150,7 +150,7 @@ class DocsActivity : Activity() {
         """.trimIndent()
 
     companion object {
-        /** 使用文档在 assets 里的位置（构建时从仓库根目录的 使用文档.md 复制过来）。 */
+        /** 使用文档在 assets 里的位置（构建时从仓库根的 README.md 复制过来）。 */
         const val MANUAL_ASSET = "docs/manual.md"
 
         private const val FILE_NAME = "抖音续火花cc-使用文档.md"

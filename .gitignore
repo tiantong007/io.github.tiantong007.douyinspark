@@ -1,11 +1,15 @@
-﻿# 构建产物
+# 构建产物
 src/local.properties
 src/.gradle/
 src/build/
 src/app/build/
 src/.idea/
+src/app/src/main/assets/docs/manual.md
+
+# APK 只在 release/ 里留最新的一个
 *.apk
-!release/douyinspark-cc.apk
+!release/douyinspark-v2.0.0.apk
+*.idsig
 
 # 签名密钥（绝不入库）
 keystore/
@@ -16,6 +20,3 @@ keystore/
 # 临时
 .tmp/
 *.log
-
-*.idsig
-

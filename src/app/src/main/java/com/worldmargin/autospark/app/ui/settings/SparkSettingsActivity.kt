@@ -663,7 +663,7 @@ class SparkSettingsActivity : Activity() {
                 )
             }
 
-            SUB_ALARM -> buildAlarmPage(config, body)
+            SUB_ALARM -> buildAlarmSection(config, body)
 
             SUB_GUIDE -> {
                 val basic = basicSteps(config)
@@ -761,7 +761,7 @@ class SparkSettingsActivity : Activity() {
                         addView(text("配置与快照", 14f, COLOR_TEXT))
                         addView(
                             text(
-                                "/data/data/com.worldmargin.autospark/files/spark_config.json",
+                                "/data/data/$packageName/files/spark_config.json",
                                 12f,
                                 COLOR_DIM,
                             ),
@@ -769,39 +769,24 @@ class SparkSettingsActivity : Activity() {
                         addView(text("每次刷新会话都会重扫；总开关关闭时只扫描不发送。", 12f, COLOR_DIM))
                     },
                 )
-                body.addView(sectionTitle("署名与来源（点一下可跳转）"))
+                body.addView(sectionTitle("链接"))
                 body.addView(
                     linkRow(
-                        title = "原仓库 · yfishyon/doumcp",
-                        url = "https://github.com/yfishyon/doumcp",
-                        desc = "抖音逆向与注入能力的基础（Apache-2.0）",
+                        title = "本仓库 · tiantong007/io.github.tiantong007.douyinspark",
+                        url = "https://github.com/tiantong007/io.github.tiantong007.douyinspark",
+                        desc = "源码、Release、使用文档",
                     ),
                 )
                 body.addView(
                     linkRow(
-                        title = "重写版 · WorldMargin/SparkFlame",
-                        url = "https://gitee.com/WorldMargin/SparkFlame",
-                        desc = "本模块：模板 / 宏 / 函数 + Monaco 编辑器",
-                    ),
-                )
-                body.addView(
-                    linkRow(
-                        title = "WorldMargin",
-                        url = "https://gitee.com/WorldMargin",
-                        desc = "模板 / 宏 / 函数 这套思路，以及 DouYinSpark 油猴脚本原作",
-                    ),
-                )
-                body.addView(
-                    linkRow(
-                        title = "DeepSeek",
-                        url = "https://www.deepseek.com",
-                        desc = "把 DouYinSpark 油猴脚本的完整逻辑迁移至安卓",
+                        title = "上游 · WorldMargin/SparkFlame",
+                        url = "https://github.com/WorldMargin/SparkFlame",
+                        desc = "本模块基于它 v1.5.7 改造（Apache-2.0）",
                     ),
                 )
                 body.addView(
                     text(
-                        "本模块 fork 自 doumcp（Apache-2.0 许可），只保留「续火花」功能；" +
-                            "界面、脚本引擎、模板与宏体系为重写。",
+                        "Apache-2.0。上游版权声明保留在仓库 LICENSE 中。",
                         12f,
                         COLOR_DIM,
                     ).apply { setPadding(dp(2), dp(8), 0, 0) },
@@ -2962,39 +2947,28 @@ class SparkSettingsActivity : Activity() {
     // ------------------------------------------------------------------ 定时唤醒
 
     /**
-     * 定时唤醒页。
+     * 定时唤醒：直接嵌在设置页「总开关」下面，不再单开二级页。
      *
      * 模块跑在抖音进程里，抖音不启动就没有任何代码在跑 —— 这是「锁屏也能自动发」的唯一障碍。
      * 这里用 AlarmManager 每天到点把抖音拉起来，剩下的交给宿主侧的
      * [com.worldmargin.autospark.host.bridge.AutoSparkBridge.scheduleOnAppStart]。
      */
-    private fun buildAlarmPage(
+    private fun buildAlarmSection(
         config: SparkConfig,
         body: LinearLayout,
     ) {
         val enabled = config.alarmHour in 0..23
         val at = if (enabled) DailyAlarm.nextTriggerAt(config.alarmHour, config.alarmMinute) else 0L
-
-        body.addView(
-            card().apply {
-                addView(text("定时唤醒", 16f, bold = true))
-                addView(
-                    text(
-                        "模块跑在抖音进程里，抖音不启动就不会有任何动作。" +
-                            "打开这里的开关后，每天到点由系统把抖音拉起来，模块随后自动扫一轮并发送。",
-                        12f,
-                        COLOR_DIM,
-                    ),
-                )
-            },
-        )
+        val overlay = DailyAlarm.canStartFromBackground(this)
+        val exact = DailyAlarm.canScheduleExact(this)
 
         body.addView(
             card().apply {
                 addView(
                     switchRow(
-                        "每天定时打开抖音",
-                        if (enabled) "下次：${formatClock(at)}" else "关闭时完全不动系统闹钟",
+                        "定时打开抖音",
+                        if (enabled) "每天 %02d:%02d · 下次 %s".format(config.alarmHour, config.alarmMinute, formatClock(at))
+                        else "锁屏也能发：到点由系统拉起抖音",
                         enabled,
                     ) { on ->
                         if (on) {
@@ -3030,56 +3004,34 @@ class SparkSettingsActivity : Activity() {
                             }
                         },
                     )
+                    // 缺权限时才露出来，不占地方
+                    if (!overlay) {
+                        addView(divider())
+                        addView(
+                            menuRow(
+                                UiKit.Icons.CLOSE,
+                                "缺「后台弹出界面」权限",
+                                "不给的话闹钟响了抖音也起不来，必须开",
+                            ) { openOverlaySettings() },
+                        )
+                    }
+                    if (!exact) {
+                        addView(divider())
+                        addView(
+                            menuRow(
+                                UiKit.Icons.CLOSE,
+                                "精确闹钟未授权",
+                                "仍会响，但可能晚十几分钟（够用）",
+                            ) { openExactAlarmSettings() },
+                        )
+                    }
+                    addView(divider())
+                    addView(
+                        menuRow(UiKit.Icons.SERVER, "电池优化", "设为「不限制」，否则部分 ROM 会压掉闹钟") {
+                            openBatterySettings()
+                        },
+                    )
                 }
-            },
-        )
-
-        body.addView(sectionTitle("权限"))
-        body.addView(
-            card().apply {
-                val overlay = DailyAlarm.canStartFromBackground(this@SparkSettingsActivity)
-                val exact = DailyAlarm.canScheduleExact(this@SparkSettingsActivity)
-                addView(
-                    menuRow(
-                        if (overlay) UiKit.Icons.CHECK else UiKit.Icons.CLOSE,
-                        "后台弹出界面（悬浮窗）",
-                        if (overlay) "已授权" else "未授权：Android 10+ 会拦住后台启动抖音，必须开",
-                    ) {
-                        if (!overlay) openOverlaySettings()
-                    },
-                )
-                addView(
-                    menuRow(
-                        if (exact) UiKit.Icons.CHECK else UiKit.Icons.CLOSE,
-                        "精确闹钟",
-                        if (exact) "已授权" else "未授权：仍会响，但可能晚十几分钟（够用）",
-                    ) {
-                        if (!exact) openExactAlarmSettings()
-                    },
-                )
-                addView(
-                    menuRow(UiKit.Icons.SERVER, "电池优化", "把本模块设为「不限制」，否则部分 ROM 会压掉闹钟") {
-                        openBatterySettings()
-                    },
-                )
-            },
-        )
-
-        body.addView(sectionTitle("说明"))
-        body.addView(
-            card().apply {
-                addView(
-                    text(
-                        "1. 到点后系统拉起抖音，抖音进程启动 → 模块注入 → 扫描 → 发送。" +
-                            "发送不需要亮屏，也不需要解锁。\n" +
-                            "2. 抖音启动后会自动停在自己的界面。想让它发完就退回后台，" +
-                            "在系统「应用 → 抖音 → 权限」里关掉「显示在其他应用上层」以外的悬浮窗类权限，或用 MIUI 自动任务追加一步返回桌面。\n" +
-                            "3. 手机重启后闹钟会自动重排（已申请开机广播）。\n" +
-                            "4. 总开关关闭时，定时唤醒只会扫描不会发送。",
-                        12f,
-                        COLOR_DIM,
-                    ),
-                )
             },
         )
     }
@@ -3678,6 +3630,9 @@ class SparkSettingsActivity : Activity() {
             },
         )
 
+        body.addView(sectionTitle("定时唤醒"))
+        buildAlarmSection(config, body)
+
         body.addView(
             row().apply {
                 setPadding(0, dp(12), 0, 0)
@@ -3702,11 +3657,6 @@ class SparkSettingsActivity : Activity() {
         body.addView(
             menuRow(UiKit.Icons.SWAP, "手动归属", manualSummary(config)) {
                 openSubPage(SUB_ASSIGN)
-            },
-        )
-        body.addView(
-            menuRow(UiKit.Icons.ZAP, "定时唤醒", alarmSummary(config)) {
-                openSubPage(SUB_ALARM)
             },
         )
         body.addView(

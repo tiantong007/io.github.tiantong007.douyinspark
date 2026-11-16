@@ -22,6 +22,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "DouMCP"
+rootProject.name = "DouyinSparkCC"
 
 include(":app")

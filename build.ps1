@@ -1,4 +1,4 @@
-﻿# build.ps1 — 一键：编译 → zipalign → 签名 → 输出到 release\
+# build.ps1 — 一键：编译 → zipalign → 签名 → 输出到 release\
 # 用法: .\build.ps1            (arm64 + armeabi 都签)
 #       .\build.ps1 -Arm64Only (只签 arm64)
 param([switch]$Arm64Only)
@@ -29,7 +29,7 @@ foreach ($abi in $abis) {
     $unsigned = "$outDir\app-$abi-release-unsigned.apk"
     if (-not (Test-Path $unsigned)) { Write-Warning "跳过 $abi（没产物）"; continue }
     $aligned = "$root\.tmp\aligned-$abi.apk"
-    $signed  = "$root\release\douyinspark-cc-$abi.apk"
+    $signed  = "$root\release\douyinspark-$abi.apk"
     New-Item -ItemType Directory -Force "$root\.tmp" | Out-Null
 
     Write-Host "[2/4] 对齐 $abi ..." -ForegroundColor Cyan

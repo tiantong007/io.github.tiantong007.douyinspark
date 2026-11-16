@@ -33,8 +33,8 @@ android {
         minSdk = 26
         targetSdk = 36
         // 固定版本号：历史压缩后提交数会变小，不能再拿它当 versionCode（会触发降级安装失败）
-        versionCode = 11113
-        versionName = "v1.6.0-cc2"
+        versionCode = 20001
+        versionName = "v2.0.0"
     }
 
     // 按 ABI 分包：arm64-v8a / armeabi-v7a 各出一个 APK
@@ -88,31 +88,21 @@ dependencies {
 }
 
 /**
- * 使用文档：仓库里只保留一份 `docs/manual.md`（网页上能直接看，也方便丢给 AI）。
+ * 使用文档：**仓库根的 `README.md` 是唯一来源**。
  *
- * 改动流程：写仓库根目录的 `使用文档.md` → 构建时同步到 `docs/manual.md` → 再复制进
- * `assets/docs/manual.md` 给 App 读。assets 里那份是构建产物，不入库。
+ * README 既给网页看，也是 App 内「使用文档」的内容 —— 一份文件两处用，不会出现
+ * 「网页上写了、App 里没更新」这种分叉。构建时复制进 `assets/docs/manual.md`，
+ * 那份是构建产物，不入库（见 src/.gitignore）。
  */
-val manualSource = layout.projectDirectory.file("../../使用文档.md")
+val manualSource = layout.projectDirectory.file("../../README.md")
 
-/** `docs/manual.md`：仓库里唯一入库的那一份。 */
-val syncManualToRepo =
-    tasks.register<Copy>("syncManualToRepo") {
-        onlyIf { manualSource.asFile.exists() }
-        from(manualSource)
-        into(rootProject.layout.projectDirectory.dir("docs"))
-        rename { "manual.md" }
-    }
-
-/** `assets/docs/manual.md`：App 内使用文档，构建时从 `docs/manual.md` 复制，不入库。 */
+/** `assets/docs/manual.md`：App 内使用文档，构建时从仓库根 README.md 复制，不入库。 */
 val syncManual =
     tasks.register<Copy>("syncManual") {
-        val repoSingle = rootProject.layout.projectDirectory.file("docs/manual.md")
-        onlyIf { repoSingle.asFile.exists() }
-        from(repoSingle)
+        onlyIf { manualSource.asFile.exists() }
+        from(manualSource)
         into(layout.projectDirectory.dir("src/main/assets/docs"))
         rename { "manual.md" }
-        dependsOn(syncManualToRepo)
     }
 
-tasks.named("preBuild") { dependsOn(syncManual, syncManualToRepo) }
+tasks.named("preBuild") { dependsOn(syncManual) }
