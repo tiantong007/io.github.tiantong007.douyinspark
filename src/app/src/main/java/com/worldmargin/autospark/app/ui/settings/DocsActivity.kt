@@ -11,8 +11,6 @@ import android.webkit.WebView
 import android.widget.LinearLayout
 import android.widget.Toast
 import com.worldmargin.autospark.app.config.ConfigStore
-import com.worldmargin.autospark.app.ui.common.UiKit.COLOR_DIM
-import com.worldmargin.autospark.app.ui.common.UiKit.button
 import com.worldmargin.autospark.app.ui.common.UiKit.column
 import com.worldmargin.autospark.app.ui.common.UiKit.divider
 import com.worldmargin.autospark.app.ui.common.UiKit.dp

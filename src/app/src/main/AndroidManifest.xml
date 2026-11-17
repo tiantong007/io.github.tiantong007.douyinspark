@@ -9,7 +9,10 @@
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <!-- 定时唤醒：重启后重排闹钟（否则关机一次就再也不响了） -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <!-- 定时唤醒：Android 10+ 后台启动 Activity 需要「悬浮窗」权限才放行 -->
+    <!--
+         悬浮窗：定时唤醒走 root + monkey，**不依赖它**（见 DailyAlarm 注释）。
+         保留声明是因为设置页仍会显示该权限状态，且旧版本用户升级后不会掉权限。
+    -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- 定时唤醒：点亮屏幕（部分 ROM 上后台 Activity 需要） -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -45,12 +48,20 @@
             </intent-filter>
         </receiver>
 
-        <!-- 续火花管理界面：桌面图标入口 + 抖音设置页注入口（由抖音进程唤起，故需 exported） -->
+        <!--
+             续火花管理界面：桌面图标入口 + 抖音设置页注入口（由抖音进程唤起，故需 exported）。
+
+             excludeFromRecents + taskAffinity="" ：不进「最近任务」列表。因为任务卡片里
+             上滑会被 MIUI 当成 SwipeUpClean，会连带清掉本 App 的闹钟（→ 定时唤醒彻底失效），
+             所以让它压根不出现在那里。需要打开时走桌面图标或抖音设置页入口。
+        -->
         <activity
             android:name=".app.ui.settings.SparkSettingsActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:label="@string/spark_name"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
             android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -80,23 +91,6 @@
         <!-- 会话选择页：搜索 + 三页筛选 + 多选 -->
         <activity
             android:name=".app.ui.conversation.ConversationPickerActivity"
-            android:exported="false"
-            android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".app.ui.macro.SandboxVarsActivity"
-            android:exported="false"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".app.ui.macro.MacroEditActivity"
-            android:exported="false"
-            android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".app.ui.function.FunctionEditActivity"
             android:exported="false"
             android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar"
             android:windowSoftInputMode="adjustResize" />

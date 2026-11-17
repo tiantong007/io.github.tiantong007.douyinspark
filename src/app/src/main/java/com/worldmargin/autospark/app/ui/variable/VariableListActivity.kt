@@ -20,7 +20,6 @@ import com.worldmargin.autospark.app.script.SparkScriptEngine
 import com.worldmargin.autospark.app.script.PreviewData
 import com.worldmargin.autospark.app.script.TemplateVarPrelude
 import com.worldmargin.autospark.app.config.ConfigStore
-import com.worldmargin.autospark.app.ui.common.UiKit.COLOR_ACCENT
 import com.worldmargin.autospark.app.ui.common.UiKit.COLOR_BG
 import com.worldmargin.autospark.app.ui.common.UiKit.COLOR_CARD
 import com.worldmargin.autospark.app.ui.common.UiKit.COLOR_DIM

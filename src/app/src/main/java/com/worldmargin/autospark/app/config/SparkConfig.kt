@@ -5,13 +5,10 @@ import com.worldmargin.autospark.app.config.model.ConversationTemplate
 import com.worldmargin.autospark.app.config.model.MacroScript
 import com.worldmargin.autospark.app.config.model.SandboxVar
 import com.worldmargin.autospark.app.config.model.SparkTag
-import com.worldmargin.autospark.app.config.model.SyncMode
 import com.worldmargin.autospark.app.config.model.TemplateGroup
 import com.worldmargin.autospark.app.config.model.TemplateSource
 import com.worldmargin.autospark.app.config.model.TemplateVar
 import com.worldmargin.autospark.app.config.model.UserFunction
-import org.json.JSONArray
-import org.json.JSONObject
 
 data class SparkConfig(
     val enabled: Boolean = false,
@@ -58,6 +55,14 @@ data class SparkConfig(
     val alarmMinute: Int = 0,
     /** 定时唤醒是否已经拿到「后台弹出界面 / 精确闹钟」等权限（只用于界面提示，不拦功能）。 */
     val alarmAsked: Boolean = false,
+    /**
+     * 只在设定时间检查：开着的话，打开抖音不再顺带跑一轮自动续火花，
+     * 只有落在 [alarmHour] 附近的窗口里才检查。
+     *
+     * 关掉（false）就是老行为 —— 每次冷启动 / 每次回前台都检查一遍。
+     * 没设闹钟时间时该开关不生效（否则会永远不检查）。
+     */
+    val checkAtAlarmOnly: Boolean = true,
 ) {
     fun group(id: String?): TemplateGroup? = groups.firstOrNull { it.id == id }
 
@@ -228,21 +233,6 @@ data class SparkConfig(
     /** 模板自己的试算 / 预览：传播挂载 + 「仅模板」挂载都算。 */
     fun macrosForTemplate(templateId: String): List<MacroScript> =
         macros.filter { macro -> templateId in macro.appliesTo || templateId in macro.templateOnly }
-
-    /**
-     * 某个会话要执行的完整程序：**自定义函数注入 → 模板脚本 → 宏（按顺序）**。
-     *
-     * 宏的生效目标既可以是会话自己（会话模板不继承任何模板时也能用宏），
-     * 也可以是它继承的通用模板；宏是动态取的，删掉宏不影响模板内容。
-     */
-    fun programFor(conversationId: String): String {
-        val template = conversation(conversationId)
-        val targets = buildList {
-            add(conversationId)
-            template?.inheritFrom?.let { add(it) }
-        }
-        return composeProgram(template?.body.orEmpty(), macrosFor(targets))
-    }
 
     /**
      * 组装程序：函数注入 + [body] + [macros]（预览与发送共用同一份逻辑）。

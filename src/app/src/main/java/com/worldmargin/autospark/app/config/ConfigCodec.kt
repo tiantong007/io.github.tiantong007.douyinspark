@@ -1,8 +1,6 @@
 package com.worldmargin.autospark.app.config
 
 import com.worldmargin.autospark.app.config.model.*
-import com.worldmargin.autospark.app.script.SparkFunctionSource
-import com.worldmargin.autospark.app.script.TemplateVarPrelude
 import org.json.JSONArray
 import org.json.JSONObject
 import com.worldmargin.autospark.app.config.model.TemplateVar
@@ -31,6 +29,7 @@ object ConfigCodec {
     private const val KEY_ALARM_HOUR = "alarmHour"
     private const val KEY_ALARM_MINUTE = "alarmMinute"
     private const val KEY_ALARM_ASKED = "alarmAsked"
+    private const val KEY_CHECK_AT_ALARM_ONLY = "checkAtAlarmOnly"
     private const val KEY_MACROS = "macros"
     private const val KEY_FUNCTIONS = "functions"
     private const val KEY_TAGS = "tags"
@@ -44,28 +43,6 @@ object ConfigCodec {
         JSONArray().apply {
             variables.forEach { variable -> put(JSONObject().put("name", variable.name).put("expr", variable.expr)) }
         }
-
-    /** 沙盒变量数组 → JSON（配置存储与页面传参共用同一份编码）。 */
-    fun encodeSandbox(vars: List<SandboxVar>): String =
-        JSONArray().apply {
-            vars.forEach { item ->
-                put(JSONObject().put("owner", item.owner).put("key", item.key).put("value", item.value))
-            }
-        }.toString()
-
-    /** JSON → 沙盒变量数组（解不出来就当空）。 */
-    fun decodeSandbox(text: String?): List<SandboxVar> {
-        val array = runCatching { JSONArray(text.orEmpty()) }.getOrNull() ?: return emptyList()
-        return (0 until array.length()).mapNotNull { index ->
-            array.optJSONObject(index)?.let {
-                SandboxVar(it.optString("owner"), it.optString("key"), it.optString("value"))
-            }
-        }
-    }
-
-    /** 值是否为合法 JSON（空串算合法，按 null 存）。 */
-    fun isValidJsonValue(raw: String): Boolean =
-        raw.isBlank() || runCatching { org.json.JSONTokener(raw).nextValue() }.isSuccess
 
     /** JSON → 模板变量数组（缺字段按空串处理）。 */
     fun decodeVars(array: JSONArray?): List<TemplateVar> =
@@ -207,6 +184,7 @@ object ConfigCodec {
             .put(KEY_ALARM_HOUR, config.alarmHour)
             .put(KEY_ALARM_MINUTE, config.alarmMinute)
             .put(KEY_ALARM_ASKED, config.alarmAsked)
+            .put(KEY_CHECK_AT_ALARM_ONLY, config.checkAtAlarmOnly)
             .toString()
     }
 
@@ -384,6 +362,7 @@ object ConfigCodec {
             alarmHour = root.optInt(KEY_ALARM_HOUR, -1),
             alarmMinute = root.optInt(KEY_ALARM_MINUTE, 0),
             alarmAsked = root.optBoolean(KEY_ALARM_ASKED),
+            checkAtAlarmOnly = root.optBoolean(KEY_CHECK_AT_ALARM_ONLY, true),
         )
     }
 

@@ -22,11 +22,3 @@
 # Rhino 内部有一条 JSON 转换路径引用 java.beans.*（Android 上没有这些类），
 # R8 的 missing class 检查会因此中断构建；那条路径在 Android 上不会执行。
 -dontwarn java.beans.**
-
-# ---- WebView 的 JS 桥 ----
-# @JavascriptInterface 的方法由网页按名字调用，R8 改名 / 删除后 JS 回调进不来。
-# 本版编辑器已改成原生文本框，这里保留以防以后再加 WebView。
--keepattributes JavascriptInterface
--keepclassmembers class * {
-    @android.webkit.JavascriptInterface <methods>;
-}

@@ -713,6 +713,33 @@ object AutoSparkBridge {
         runCatching { lastRunFile(context).writeText(day) }
     }
 
+    /** 闹钟时间窗：设定点前 10 分钟到后 6 小时，命中就算「现在是该检查的时候」。 */
+    private const val ALARM_WINDOW_AFTER_MS = 6L * 60 * 60 * 1000
+    private const val ALARM_WINDOW_BEFORE_MS = 10L * 60 * 1000
+
+    /**
+     * 该不该跑这一轮检查。
+     *
+     * 「只在设定时间检查」开着时，只有落在 [SparkConfig.alarmHour]:[SparkConfig.alarmMinute]
+     * 附近才跑，避免用户每次打开抖音都白等一轮扫描（冷启动探测 IM 要 5 秒起）。
+     *
+     * 三种情况一律放行：开关关着 / 没设闹钟时间 / 配置读不到。
+     */
+    private fun shouldCheckNow(context: Context): Boolean {
+        val config = ConfigClient.read(context) ?: return true
+        if (!config.checkAtAlarmOnly) return true
+        if (config.alarmHour !in 0..23) return true
+        val target =
+            Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, config.alarmHour)
+                set(Calendar.MINUTE, config.alarmMinute)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+        val diff = System.currentTimeMillis() - target
+        return diff >= -ALARM_WINDOW_BEFORE_MS && diff <= ALARM_WINDOW_AFTER_MS
+    }
+
     /**
      * 挂上值守：抖音有 Activity 可见时按时间自动升级检查频率。
      *
@@ -819,6 +846,8 @@ object AutoSparkBridge {
      */
     private fun scanOnForeground(context: Context) {
         val now = System.currentTimeMillis()
+        // 同 scheduleOnAppStart：不在检查时间窗内就不扫
+        if (!shouldCheckNow(context)) return
         if (now - lastForegroundScanMs < FOREGROUND_SCAN_INTERVAL_MS) return
         if (now - lastAutoRunMs < FOREGROUND_SCAN_AFTER_AUTO_MS) return
         lastForegroundScanMs = now
@@ -1105,6 +1134,11 @@ object AutoSparkBridge {
     /** 打开抖音后延迟自动执行一次（总开关关闭时内部直接返回），并刷新会话快照。 */
     fun scheduleOnAppStart() {
         val context = HostRuntime.context ?: return
+        // 只在设定时间检查：不在窗口内直接返回，不白跑 60 秒的 IM 探测
+        if (!shouldCheckNow(context)) {
+            ModLog.i("不在检查时间窗内，本次不检查")
+            return
+        }
         Thread(
             {
                 wakeModule(context)

@@ -8,7 +8,8 @@ src/app/src/main/assets/docs/manual.md
 
 # APK 只在 release/ 里留最新的一个
 *.apk
-!release/douyinspark-v2.0.0.apk
+!release/douyinspark-arm64-v8a.apk
+!release/douyinspark-armeabi-v7a.apk
 *.idsig
 
 # 签名密钥（绝不入库）

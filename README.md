@@ -15,7 +15,7 @@
 - [三、界面](#三界面)
 - [四、总开关](#四总开关)
 - [五、什么时候会发](#五什么时候会发)
-- [六、定时唤醒（锁屏也能发）](#六定时唤醒锁屏也能发)
+- [六、定时唤醒（锁屏也能发，需要 root）](#六定时唤醒锁屏也能发需要-root)
 - [七、模板、变量与保留](#七模板变量与保留)
 - [八、脚本 API](#八脚本-api)
 - [九、编辑器](#九编辑器)
@@ -54,7 +54,7 @@ ctx.result.push(who + "，火花 " + ctx.io.days + " 天啦");
 
 ### 定时唤醒
 
-模块跑在抖音进程里，抖音不启动就没有代码在跑 —— 这是锁屏自动发的唯一障碍。用 `AlarmManager` 每天到点拉起抖音，发送本身不需要亮屏、不需要解锁。见[第六节](#六定时唤醒锁屏也能发)。
+模块跑在抖音进程里，抖音不启动就没有代码在跑 —— 这是锁屏自动发的唯一障碍。用 `AlarmManager` 每天到点 + root `monkey` 拉起抖音，发送本身不需要亮屏、不需要解锁。**需要 root。**见[第六节](#六定时唤醒锁屏也能发需要-root)。
 
 ### 模板
 
@@ -87,7 +87,7 @@ ctx.result.push(who + "，火花 " + ctx.io.days + " 天啦");
 
 ## 三、界面
 
-底部三个标签：**续火花 / 模板 / 设置**。
+底部三个页签：**续火花 / 模板 / 设置**。
 
 ### 3.1 续火花
 
@@ -232,48 +232,61 @@ XXX      跟随父模板
 
 ---
 
-## 六、定时唤醒（锁屏也能发）
+## 六、定时唤醒（锁屏也能发，需要 root）
 
 模块的代码跑在**抖音进程里**（LSPosed 注入）。抖音不启动 = 没有任何代码在跑 —— 这是「锁屏自动发」唯一的技术障碍。
 
-用系统闹钟解决它：
+整条链路：
 
 ```
-每天 08:00 → AlarmManager 叫醒本模块
-           → 启动抖音 SplashActivity
-           → 抖音进程启动 → Application.attach 被 hook
-           → 扫描 → 发送
+每天设定时间 → AlarmManager 叫醒本模块进程
+             → root + monkey 拉起抖音（不亮屏、能清 stopped 标记）
+             → 抖音进程启动 → Application.attach 被 hook
+             → 扫描 → 发送 → 写 spark_last_auto_day
+             → 模块检测到已发 → am force-stop 关掉抖音
 ```
 
-**发送本身不需要亮屏、不需要解锁**，它只走 IM SDK 的发送链路。所以手机锁在兜里也能发出去。
+**发送本身不需要亮屏、不需要解锁**，它只走 IM SDK 的发送链路。
 
-### 6.1 开启步骤
+### 6.1 为什么必须 root
+
+拉起抖音这一步走的是系统自带的 `monkey`（AMS 注入通道），不走 `startActivity` —— 后者在 Android 10+ 会被 `backgroundActivityAllowed=false` 拦掉。
+
+`monkey` 只接受 root 或 shell 身份。普通 App 身份执行会被系统直接 `Killed`：
+
+```
+su 10276 -c "monkey -p com.ss.android.ugc.aweme ... 1"   → Killed
+su 0     -c "monkey -p com.ss.android.ugc.aweme ... 1"   → Events injected: 1
+```
+
+所以**没有 root 就没有定时唤醒**，设置页会显示「未获得 root 授权」，不做降级。
+
+### 6.2 开启步骤
 
 | 步骤 | 说明 |
 |---|---|
-| 1. 设置 → 定时唤醒 → 打开「定时打开抖音」 | 选一个钟点，默认 08:00 |
-| 2. 给「后台弹出界面」权限 | **必须**。Android 10+ 禁止后台启动界面，没这个权限闹钟响了抖音也起不来 |
+| 1. 在 KernelSU / Magisk 里给本模块授权 root | **必须**。授权后设置页的「定时唤醒」才不再报缺 root |
+| 2. 设置 → 定时唤醒 → 打开「定时打开抖音」 | 点「修改时间」用滚轮选钟点，不用手输 |
 | 3. 精确闹钟（可选） | 不给也能用，只是可能晚十几分钟 |
 | 4. 电池优化设为「不限制」 | 部分 ROM（MIUI/EMUI）会压掉闹钟 |
 
-缺权限时，设置页对应位置会露出红色修复入口，点进去直接跳系统设置。
-
-### 6.2 权限对照
+### 6.3 权限对照
 
 | 权限 | 作用 | 缺了会怎样 |
 |---|---|---|
-| `SYSTEM_ALERT_WINDOW` | Android 10+ 后台启动 Activity 的准入 | **闹钟响了抖音也起不来** |
+| root（KernelSU / Magisk） | 用 `monkey` 拉起抖音 | **闹钟响了抖音也起不来** |
 | `SCHEDULE_EXACT_ALARM` | 精确定时 | 退化成 `setAndAllowWhileIdle`，可能晚十几分钟 |
 | `RECEIVE_BOOT_COMPLETED` | 重启后重排闹钟 | 关机一次就再也不响 |
-| `WAKE_LOCK` | 部分 ROM 上后台 Activity 需要 | 偶发起不来 |
+| `WAKE_LOCK` | 等发送期间撑住进程 | 抖音还在冷启动时模块进程就被回收 |
 
-### 6.3 注意
+### 6.4 注意
 
-- 抖音被拉起后会停在自己的界面。不想看到它，用 MIUI 自动任务在闹钟之后追加一步「返回桌面」。
-- 手机重启后闹钟自动重排。
+- **全程不亮屏**：`monkey` 拉起时 `mWakefulness` 保持 `Asleep`，屏幕不会亮。
+- 发完会 `am force-stop` 关掉抖音，不留后台。
+- 手机重启后闹钟自动重排；覆盖安装（`MY_PACKAGE_REPLACED`）同样会重排。
 - 精确闹钟是一次性的，响完 `AlarmReceiver` 立刻排下一天。
-- 总开关关闭时，定时唤醒**只扫描不发送**。
-- 不想用定时唤醒也没关系：抖音被你自己打开时同样会跑一轮。
+- **手动「一键清理」/「上滑清理」会连闹钟一起清掉**（`force-stop` 清空该 uid 全部 AlarmManager 闹钟）。这种情况下需要手动打开一次本模块 App 恢复。「最近任务」里不显示本模块卡片（`excludeFromRecents`），所以不会误上滑清掉它。
+- 不想用定时唤醒也没关系：抖音被你自己打开时同样会跑一轮（受「只在设定时间检查」开关控制）。
 
 ---
 
@@ -512,13 +525,13 @@ ctx.result.push(ctx.builtin.pick([
 配置文件损坏时，模块会另存为 `spark_config.json.broken-<时间戳>` 并拒绝覆盖。
 
 **Q：能定时自动发吗？**
-能。设置 → 定时唤醒 → 打开「定时打开抖音」，并给「后台弹出界面」权限。详见第六节。
+能，但需要 root。设置 → 定时唤醒 → 打开「定时打开抖音」，并在 KernelSU / Magisk 里给本模块授权。详见第六节。
 
 **Q：锁屏能发吗？**
 能。发送不需要亮屏也不需要解锁。前提是抖音进程已经起来 —— 靠定时唤醒或你自己打开抖音触发。
 
 **Q：闹钟到点了但抖音没起来？**
-先看「设置 → 定时唤醒」里有没有红色「缺『后台弹出界面』权限」。MIUI 上这个权限在「应用信息 → 其他权限 → 显示在其他应用上层」，不在普通权限列表里。
+三件事依次查：①「设置 → 定时唤醒」是否显示「未获得 root 授权」—— 在 KernelSU / Magisk 里给本模块授权即可；② 是否刚做过一键清理 / 上滑清理（会把闹钟一起清掉，手动开一次本模块 App 恢复）；③ 是否装了两个同包名版本互相覆盖。
 
 ---
 
@@ -537,9 +550,9 @@ ctx.result.push(ctx.builtin.pick([
 ## 附录 A：一次发送的完整时序
 
 ```
-定时唤醒（AlarmManager 到点 → 拉起抖音 SplashActivity）
+定时唤醒（AlarmManager 到点 → root monkey 拉起抖音，不亮屏）
   └─ 抖音进程启动 → Application.attach 被 hook
-       └─ scheduleOnAppStart（延迟 5 秒，等 IM 就绪，最多重试 N 次）
+       └─ scheduleOnAppStart（延迟 5 秒，等 IM 就绪，最多重试 22 次 ≈ 60 秒）
 
 抖音启动 / 回前台 / 跨天
   └─ 模块扫描会话列表
@@ -556,6 +569,11 @@ ctx.result.push(ctx.builtin.pick([
                            6. 等发送回执 → Succeed / Failed
                            7. 成功则记 sentDays
 ```
+
+发送完成后的关闭（由 AlarmReceiver 侧做，不在抖音进程里）
+  └─ 每 10 秒读 /data/data/com.ss.android.ugc.aweme/files/spark_last_auto_day
+       └─ 变成今天 → 再等 3 秒让 markSent 落盘 → am force-stop 关掉抖音
+            └─ 180 秒还没变 → 放弃本轮，不动进程
 
 ---
 
@@ -617,7 +635,7 @@ tag         = <versionCode>-<versionName> → 20001-v2.0.0
 上游代码与思路的致谢：
 
 - **[yfishyon/doumcp](https://github.com/yfishyon/doumcp)** —— 抖音逆向与注入能力的基础（会话、IM 发送、火花字段等）
-- **WorldMargin** —— 模板 / 变量 / 宏 / 函数体系，以及 DouYinSpark 油猴脚本原作
+- **WorldMargin** —— 模板 / 变量体系，以及 DouYinSpark 油猴脚本原作
 - **DeepSeek** —— 把 DouYinSpark 油猴脚本逻辑迁移至安卓
 
 Apache-2.0，保留原作者版权声明，见 [LICENSE](LICENSE)。

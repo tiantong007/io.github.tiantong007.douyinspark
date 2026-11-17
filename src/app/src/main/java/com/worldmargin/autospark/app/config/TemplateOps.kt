@@ -1,7 +1,6 @@
 package com.worldmargin.autospark.app.config
 
 import com.worldmargin.autospark.app.config.model.*
-import org.json.JSONObject
 import com.worldmargin.autospark.app.config.model.SyncMode
 import com.worldmargin.autospark.app.config.model.TemplateVar
 import com.worldmargin.autospark.app.config.model.TemplateGroup
@@ -108,14 +107,6 @@ object TemplateOps {
         mode: SyncMode,
         now: Long,
     ): List<ConversationTemplate> = cascade(config, parentId, parentBody, now) { child, _ -> shouldSync(child, mode) }
-
-    /** 自动同步：父模板改动后，勾了「自动同步」且未本地改过的子模板（含其子树）跟随。 */
-    fun autoSyncChildren(
-        config: SparkConfig,
-        parentId: String,
-        parentBody: String,
-        now: Long,
-    ): List<ConversationTemplate> = cascade(config, parentId, parentBody, now) { child, _ -> child.autoSync && !child.modified }
 
     /**
      * 只把新内容推给点名的这几个子模板（保存父模板时用户确认「覆盖这些」用）。

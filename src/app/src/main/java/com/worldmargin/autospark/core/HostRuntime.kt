@@ -4,7 +4,7 @@ import android.content.Context
 import io.github.libxposed.api.XposedInterface
 
 /**
- * 宿主运行时共享状态：上下文、ClassLoader、宿主版本号、进程名、Xposed 模块实例（进程内全局可读）。
+ * 宿主运行时共享状态：上下文、ClassLoader、进程名、Xposed 模块实例（进程内全局可读）。
  */
 object HostRuntime {
     @Volatile
@@ -12,9 +12,6 @@ object HostRuntime {
 
     @Volatile
     var classLoader: ClassLoader? = null
-
-    @Volatile
-    var versionCode: Long = -1
 
     @Volatile
     var processName: String = ""

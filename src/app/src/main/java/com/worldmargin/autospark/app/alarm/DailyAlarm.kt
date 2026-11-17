@@ -17,17 +17,25 @@ import java.util.Calendar
  *
  * ```
  * AlarmManager 到点 → AlarmReceiver（本模块进程）
- *                   → startActivity(抖音 SplashActivity)
+ *                   → root + monkey 拉起抖音（不亮屏）
  *                   → 抖音进程启动 → Application.attach 被 hook
  *                   → AutoSparkBridge.scheduleOnAppStart() → 扫描 + 发送
+ *                   → AlarmReceiver 检测到已发 → am force-stop 关掉
  * ```
  *
  * 发送本身不需要屏幕亮着、也不需要解锁 —— 它只走 IM SDK 的发送链路。
  *
+ * ## 为什么用 monkey 而不是 startActivity
+ *
+ * `startActivity` 在后台会被 `backgroundActivityAllowed=false` 拦（实测
+ * `dumpsys alarm` 的 idle-options 里是这个值）。`monkey -p <pkg> -c LAUNCHER 1`
+ * 走 AMS 的注入通道，实测能在**锁屏 + Doze** 状态下拉起抖音且**不点亮屏幕**。
+ *
+ * 代价：monkey 只接受 root 或 shell 身份，普通 App 身份执行会被 `Killed`。
+ * **所以这条路依赖 root。没 root 时直接失败，不降级到 startActivity。**
+ *
  * ## 权限
  *
- * - Android 10+ 禁止后台启动 Activity。本模块申请 `SYSTEM_ALERT_WINDOW`（悬浮窗），
- *   拿到它之后系统把本应用当作「可见应用」，后台 startActivity 才放行。
  * - Android 12+ 精确闹钟需要 `SCHEDULE_EXACT_ALARM`。没拿到时退化成
  *   [AlarmManager.setAndAllowWhileIdle]（不精确，doze 下最多晚十几分钟，够用）。
  */
@@ -36,9 +44,8 @@ object DailyAlarm {
 
     const val ACTION_ALARM = "com.worldmargin.autospark.action.DAILY_ALARM"
 
-    /** 抖音的桌面入口。硬编码比动态查询可靠（抖音改 Activity 名时这里跟着改）。 */
+    /** 抖音包名。monkey 用它找入口，硬编码比动态查询可靠。 */
     private const val DOUYIN_PACKAGE = "com.ss.android.ugc.aweme"
-    private const val DOUYIN_SPLASH = "com.ss.android.ugc.aweme.splash.SplashActivity"
 
     /** 下一次触发的时间戳；[hour] 为 -1 时返回 0（未启用）。 */
     fun nextTriggerAt(
@@ -96,10 +103,6 @@ object DailyAlarm {
         runCatching { manager.cancel(pending) }
     }
 
-    /** 本应用是否已被允许后台弹出界面（`SYSTEM_ALERT_WINDOW`）。 */
-    fun canStartFromBackground(context: Context): Boolean =
-        android.provider.Settings.canDrawOverlays(context)
-
     /** 精确闹钟是否可用（Android 12 以下恒为 true）。 */
     fun canScheduleExact(context: Context): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
@@ -107,25 +110,34 @@ object DailyAlarm {
         return manager.canScheduleExactAlarms()
     }
 
-    /** 拉起抖音。失败时返回 false（没装 / 被系统拦）。 */
-    fun launchDouyin(context: Context): Boolean {
-        val intent =
-            Intent(Intent.ACTION_MAIN).apply {
-                setClassName(DOUYIN_PACKAGE, DOUYIN_SPLASH)
-                addFlags(
-                    Intent.FLAG_ACTIVITY_NEW_TASK or
-                        Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED or
-                        Intent.FLAG_ACTIVITY_NO_ANIMATION,
-                )
-            }
-        val ok = runCatching { context.startActivity(intent) }.isSuccess
-        if (ok) return true
-        // SplashActivity 名字变了（抖音升级）时退回桌面入口
-        val fallback =
-            context.packageManager.getLaunchIntentForPackage(DOUYIN_PACKAGE)?.apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
-            }
-        return fallback != null && runCatching { context.startActivity(fallback) }.isSuccess
+    /**
+     * 拉起抖音，**只走 root + monkey**。
+     *
+     * 为什么不用 startActivity：
+     * - Android 10+ 的 `backgroundActivityAllowed=false` 会让后台 startActivity 被拦；
+     * - `monkey -p <pkg> -c LAUNCHER 1` 是系统 shell 工具，走的是 AMS 的注入通道，
+     *   实测**不点亮屏幕**（`mWakefulness` 保持 Asleep）且能清掉 `stopped=true`；
+     * - 但它要求调用方是 root 或 shell，普通 App 身份跑会被 `Killed`。
+     *
+     * 没有 root 就直接失败 —— 不降级到 startActivity。原因：startActivity 会亮屏、
+     * 打断用户正在用的应用，且大概率被 BAL 拦掉，属于「看着像在工作其实不可靠」。
+     * 与其静默降级，不如让设置页明确显示「需要 root」。
+     *
+     * @return 用了哪条路，用于日志对账。
+     */
+    fun launchDouyin(): LaunchMethod =
+        RootShell.monkeyLaunch(DOUYIN_PACKAGE) ?: LaunchMethod.FAILED
+
+    /** 把抖音关掉。 */
+    fun stopDouyin(): Boolean = RootShell.amKill(DOUYIN_PACKAGE)
+
+    /** 拉起方式，用于日志与界面提示。 */
+    enum class LaunchMethod {
+        /** root + monkey，不亮屏 */
+        MONKEY,
+
+        /** 没成功（没 root / monkey 被拒 / 抖音没装） */
+        FAILED,
     }
 
     private fun pendingIntent(context: Context): PendingIntent? =

@@ -45,9 +45,6 @@ object SparkScriptEngine {
     /** 脚本上下文对象名。 */
     const val CTX = "ctx"
 
-    /** 成员访问前缀，如 `ctx.`。 */
-    const val CTX_DOT = "$CTX."
-
     /** 输出列表：`ctx.result`，脚本往里 push 文本。 */
     const val RESULT_OBJ = "result"
 
@@ -386,65 +383,14 @@ object SparkScriptEngine {
         return Context.toString(result)
     }
 
-    /** 上下文成员说明：供界面展示、编辑器补全与类型定义生成。 */
+    /** 脚本可见成员说明：只用于判定哪些变量进 `ctx.io`（见 [IO_KEYS]）。 */
     data class Doc(
         val name: String,
         val params: String,
         val desc: String,
-        /** 变量是它的类型，函数是它的返回类型（生成 `spark.d.ts` 用）。 */
-        val type: String = "any",
         /** 挂在哪个命名空间下：[BUILTIN_OBJ] 或 [IO_OBJ]。 */
         val scope: String = BUILTIN_OBJ,
-    ) {
-        /** 是否需要括号调用。 */
-        val isFunction: Boolean get() = params.isNotEmpty()
-
-        /** 完整签名，如 `ctx.builtin.pick(list)` / `ctx.io.nickname`。 */
-        val signature: String get() = "$CTX_DOT$scope.$name" + if (isFunction) "($params)" else ""
-    }
-
-    /** 内置函数：都挂在 `ctx.builtin` 下。 */
-    val FUNCTIONS: List<Doc> =
-        listOf(
-            Doc("pick", "list", "从数组里随机取一个", "any", BUILTIN_OBJ),
-            Doc("pad", "n", "数字补零到两位", "string", BUILTIN_OBJ),
-            Doc("repeat", "s, n", "把字符串 s 重复 n 次", "string", BUILTIN_OBJ),
-            Doc("random", "a, b", "[a, b) 区间内的随机整数", "number", BUILTIN_OBJ),
-            Doc("shuffle", "list", "洗牌，返回新数组", "any[]", BUILTIN_OBJ),
-            Doc("countdown", "target", "距目标日期还有几天（已过为负）", "number", BUILTIN_OBJ),
-            Doc("nextNewYear", "", "下一个元旦的日期字符串", "string", BUILTIN_OBJ),
-            Doc("untilNewYear", "", "距下一个元旦还有几天", "number", BUILTIN_OBJ),
-            Doc("formatDate", "date, pattern", "按 yyyy/MM/dd/HH/mm/ss 格式化日期", "string", BUILTIN_OBJ),
-        )
-
-    /** 沙盒与系统接口：挂在 `ctx.macro` / `ctx.system` 下。 */
-    val SANDBOX_FUNCTIONS: List<Doc> =
-        listOf(
-            Doc("id", "", "当前宏的 id（模板段为空串）", "string", MACRO_OBJ),
-            Doc("name", "", "当前宏的名字（模板段为空串）", "string", MACRO_OBJ),
-            Doc("getvar", "name", "读一个自己的变量", "any", MACRO_OBJ),
-            Doc("setvar", "name, value", "写一个自己的变量（值是任意 JS 值，存成 JSON）", "void", MACRO_OBJ),
-            Doc("deletevar", "name", "删一个自己创建的变量", "boolean", MACRO_OBJ),
-        )
-
-    /** 系统接口：挂在 `ctx.system` 下。 */
-    val SYSTEM_FUNCTIONS: List<Doc> =
-        listOf(
-            Doc(
-                "getAllConversation",
-                "filter?: SparkConversationFilter",
-                "本轮会话（SparkConversation[]）；对象逐项相等 / 数组任一 / 函数判断；tags.include、tags.except 按标签筛（内层交集、外层并集）",
-                "SparkConversation[]",
-                SYSTEM_OBJ,
-            ),
-            Doc("getConversation", "id: string", "按会话 id 取信息结构（没有返回 null）", "SparkConversationDetail | null", SYSTEM_OBJ),
-            Doc("getTemplate", "id: string", "按模板 id 取信息结构（id/name/body/childs/isBuiltin）", "any", SYSTEM_OBJ),
-            Doc("getMacro", "id: string", "按宏 id 取信息结构（id/name/body/templates/conversations）", "any", SYSTEM_OBJ),
-            Doc("getMacros", "", "所有宏的列表：id / name / appliesTo / templateOnly", "any[]", SYSTEM_OBJ),
-            Doc("mountMacro", "id: string, target?: any", "按宏 id 挂到指定会话 / 模板（不传 = 当前会话）", "void", SYSTEM_OBJ),
-            Doc("unmountMacro", "id: string, target?: any", "按宏 id 从指定会话 / 模板摘掉", "void", SYSTEM_OBJ),
-            Doc("unmountAll", "target?: any", "把指定目标上的所有宏都摘掉", "void", SYSTEM_OBJ),
-        )
+    )
 
     /**
      * 脚本可见变量，按来源分两处：
@@ -453,34 +399,22 @@ object SparkScriptEngine {
      */
     val VARIABLES: List<Doc> =
         listOf(
-            Doc("date", "", "当天日期 yyyy-MM-dd", "string", BUILTIN_OBJ),
-            Doc("time", "", "当前时间 HH:mm", "string", BUILTIN_OBJ),
-            Doc("weekday", "", "星期几", "string", BUILTIN_OBJ),
-            Doc("timestamp", "", "当前毫秒时间戳", "number", BUILTIN_OBJ),
-            Doc("id", "", "会话 ID（与会话对象的 id 一致）", "string", IO_OBJ),
-            Doc("nickname", "", "对方昵称", "string", IO_OBJ),
-            Doc("remark", "", "备注名（可能为空）", "string", IO_OBJ),
-            Doc("name", "", "显示名（备注优先，其次昵称）", "string", IO_OBJ),
-            Doc("days", "", "已连续聊天天数", "number", IO_OBJ),
-            Doc("state", "", "火花状态码", "number", IO_OBJ),
-            Doc("stateText", "", "火花状态文本", "string", IO_OBJ),
-            Doc("peerUid", "", "对方 UID", "string", IO_OBJ),
+            Doc("date", "", "当天日期 yyyy-MM-dd", BUILTIN_OBJ),
+            Doc("time", "", "当前时间 HH:mm", BUILTIN_OBJ),
+            Doc("weekday", "", "星期几", BUILTIN_OBJ),
+            Doc("timestamp", "", "当前毫秒时间戳", BUILTIN_OBJ),
+            Doc("id", "", "会话 ID（与会话对象的 id 一致）", IO_OBJ),
+            Doc("nickname", "", "对方昵称", IO_OBJ),
+            Doc("remark", "", "备注名（可能为空）", IO_OBJ),
+            Doc("name", "", "显示名（备注优先，其次昵称）", IO_OBJ),
+            Doc("days", "", "已连续聊天天数", IO_OBJ),
+            Doc("state", "", "火花状态码", IO_OBJ),
+            Doc("stateText", "", "火花状态文本", IO_OBJ),
+            Doc("peerUid", "", "对方 UID", IO_OBJ),
         )
 
     /** 宿主数据（`ctx.io` 下）的键：其余变量都进 `ctx.builtin`。 */
     private val IO_KEYS: Set<String> = VARIABLES.filter { it.scope == IO_OBJ }.map { it.name }.toSet()
-
-    /** 内置函数的形参声明（生成类型定义用，键是函数名）。 */
-    val PARAM_TYPES: Map<String, String> =
-        mapOf(
-            "pick" to "list: any[]",
-            "pad" to "n: number",
-            "repeat" to "s: string, n: number",
-            "random" to "a: number, b: number",
-            "shuffle" to "list: any[]",
-            "countdown" to "target: string",
-            "formatDate" to "date: string, pattern?: string",
-        )
 
     /** 全局宏：脚本里以 `ctx.builtin.xxx(...)` / `ctx.macro.xxx(...)` / `ctx.system.xxx(...)` 调用。 */
     private val MACROS =

@@ -49,15 +49,6 @@ object Reflect {
             map
         }
 
-    /**
-     * 遍历实例上所有字段的值（字段名 → 值）。
-     * 字段对象走缓存，值每次现取。
-     */
-    fun valuesOf(holder: Any): List<Triple<String, Class<*>, Any?>> =
-        fieldsOf(holder.javaClass).values.map { field ->
-            Triple(field.name, field.type, runCatching { field.get(holder) }.getOrNull())
-        }
-
     /** 按名带参调用（参数类型匹配法：先精确类型，再宽松）。 */
     fun invoke(
         target: Any,
@@ -69,23 +60,6 @@ object Reflect {
                 it.name == name && it.parameterCount == args.size
             } ?: return null
         return runCatching { method.invoke(target, *args) }.getOrNull()
-    }
-
-    /**
-     * 调无参方法，异常原样抛出（不吞）——诊断网络调用失败原因时用。
-     */
-    fun invokeOrThrow(
-        holder: Any,
-        name: String,
-    ): Any {
-        val method =
-            holder.javaClass.methods.firstOrNull { it.name == name && it.parameterCount == 0 }
-                ?: throw IllegalStateException("方法不存在: $name")
-        return try {
-            method.invoke(holder) ?: throw IllegalStateException("$name 返回 null")
-        } catch (e: java.lang.reflect.InvocationTargetException) {
-            throw (e.cause ?: e)
-        }
     }
 
     /** 调无参 getter。 */

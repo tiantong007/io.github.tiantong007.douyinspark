@@ -1,7 +1,5 @@
 package com.worldmargin.autospark.app.config.model
 
-import org.json.JSONArray
-import org.json.JSONObject
 import com.worldmargin.autospark.app.config.Hash
 import com.worldmargin.autospark.app.config.SparkConfig
 /** 会话的文案模板（继承某个一级模板，或自己写）。 */
@@ -24,10 +22,3 @@ data class ConversationTemplate(
     val modified: Boolean
         get() = inheritFrom != null && inheritFrom != SparkConfig.BUILTIN_BLANK && Hash.of(body) != parentHashAtSync
 }
-
-/**
- * 宏：一段独立的小脚本，可以挂到**多个模板**（模板 id）或**某个会话**（会话 id）上。
- *
- * 执行顺序是「自定义函数注入 → 模板脚本 → 宏（按顺序）」，所以宏能改写 `$spark_result$`。
- * 典型用法是节日倒计时这种临时性内容：用完把宏删掉，模板一个字都不用动。
- */

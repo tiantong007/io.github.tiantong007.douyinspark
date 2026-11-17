@@ -9,10 +9,8 @@ import android.view.ViewGroup
 import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.Toast
-import com.worldmargin.autospark.host.bridge.AutoSparkBridge
 import com.worldmargin.autospark.app.config.BuiltinTemplates
 import com.worldmargin.autospark.app.config.ConfigCodec
-import com.worldmargin.autospark.app.config.model.ConversationTemplate
 import com.worldmargin.autospark.app.config.SparkConfig
 import com.worldmargin.autospark.app.config.TemplateOps
 import com.worldmargin.autospark.app.config.model.TemplateSource
@@ -21,15 +19,12 @@ import com.worldmargin.autospark.app.script.SparkScriptEngine
 import com.worldmargin.autospark.app.script.PreviewData
 import com.worldmargin.autospark.app.script.TemplateVarPrelude
 import com.worldmargin.autospark.app.config.ConfigStore
-import com.worldmargin.autospark.app.ui.settings.SparkSettingsActivity
 import com.worldmargin.autospark.app.ui.common.UiKit.COLOR_ACCENT
-import com.worldmargin.autospark.app.ui.common.UiKit.COLOR_CARD
 import com.worldmargin.autospark.app.ui.common.UiKit.COLOR_DIM
 import com.worldmargin.autospark.app.ui.common.UiKit.COLOR_TEXT
 import com.worldmargin.autospark.app.ui.common.UiKit.COLOR_WARN
 import com.worldmargin.autospark.app.ui.common.UiKit.actionRow
 import com.worldmargin.autospark.app.ui.common.UiKit.card
-import com.worldmargin.autospark.app.ui.common.UiKit.button
 import com.worldmargin.autospark.app.ui.common.UiKit.column
 import com.worldmargin.autospark.app.ui.common.UiKit.divider
 import com.worldmargin.autospark.app.ui.common.UiKit.dp

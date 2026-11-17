@@ -1,4 +1,4 @@
-# build.ps1 — 一键：编译 → zipalign → 签名 → 输出到 release\
+﻿# build.ps1 — 一键：编译 → zipalign → 签名 → 输出到 release\
 # 用法: .\build.ps1            (arm64 + armeabi 都签)
 #       .\build.ps1 -Arm64Only (只签 arm64)
 param([switch]$Arm64Only)

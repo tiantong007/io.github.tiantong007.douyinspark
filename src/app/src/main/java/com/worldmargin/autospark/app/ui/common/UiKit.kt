@@ -1,6 +1,5 @@
 package com.worldmargin.autospark.app.ui.common
 
-import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -36,11 +35,9 @@ object UiKit {
     object Icons {
         const val FIRE = "\ueaf2"
         const val TEMPLATE = "\ueaf0"
-        const val CODE = "\ueac4"
         const val GEAR = "\ueb51"
         const val BACK = "\uea9b"
         const val CHEVRON_RIGHT = "\ueab6"
-        const val CHEVRON_DOWN = "\ueab4"
         const val ADD = "\uea60"
         const val REMOVE = "\ueb3b"
         const val GRAPH = "\ueb03"
@@ -48,25 +45,15 @@ object UiKit {
         const val LIGHTBULB = "\uea61"
         const val WAND = "\uebcf"
         const val DISCARD = "\ueae2"
-        const val SNIPPET = "\ueb66"
         const val CLEAR_ALL = "\ueabf"
-        /** 正方体（method 画出来也是正方体，宏用它）：codicon 的 symbol-module(`\uea8b`) 实际是 `{}`。 */
-        const val PACKAGE = "\ueb29"
 
         /** 折叠 / 展开：分组卡片标题右侧的三角形（▾ 展开态 / ▸ 收起态），换字形不做旋转。 */
         const val FOLD = "\ueaf5"
         const val UNFOLD = "\ueb73"
 
-        /** `{}`：函数用它（symbol-namespace）。 */
-        const val NAMESPACE = "\uea8b"
-
-        /** 插头：把宏挂到模板 / 会话上（这套字体没有纸夹 attach，plug 最贴）。 */
-        const val PLUG = "\uec34"
         const val CLIPPY = "\ueac0"
         const val PERSON_ADD = "\uebcd"
         const val CLONE = "\uea78"
-        const val TARGET = "\uebf8"
-        const val CHECKLIST = "\ueab3"
 
         /** 全选（list-selection）：长按工具条上「全选」用它。 */
         const val SELECTION = "\ueb85"
@@ -74,14 +61,7 @@ object UiKit {
         /** 模板变量（variable-group）：变量入口用它。 */
         const val VARIABLE_GROUP = "\uebb8"
         const val PREVIEW = "\ueb2f"
-        const val ZAP = "\uea86"
-        const val MOVE = "\ueb22"
-        const val METHOD = "\uea8c"
-        const val SAVE = "\ueb4b"
         const val NEW_FILE = "\uea7f"
-        const val NOTE = "\ueb26"
-        const val TAG = "\uea66"
-        const val INSERT = "\uec11"
         const val BOOK = "\ueaa4"
         const val SERVER = "\ueba2"
         const val INFO = "\uea74"
@@ -93,15 +73,11 @@ object UiKit {
         const val COPY = "\uebcc"
         const val SHARE = "\uec25"
         const val DOWNLOAD = "\ueac2"
-        const val EXPORT = "\uebac"
         const val IMPORT = "\ueac3"
         const val EDIT = "\uea73"
         const val TRASH = "\uea81"
         const val MAIL = "\ueb1c"
-        const val WARNING = "\uea6c"
         const val LINK = "\ueb15"
-        const val PERSON = "\uea67"
-        const val GROUP = "\uea7e"
     }
 
     private var iconTypeface: Typeface? = null

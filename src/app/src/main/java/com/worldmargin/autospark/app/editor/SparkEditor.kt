@@ -34,9 +34,6 @@ interface SparkEditor {
         templateVars: List<TemplateVar> = emptyList(),
     ) {}
 
-    /** 主动唤起补全：原生编辑器无补全，空实现。 */
-    fun showCompletion() {}
-
     /** 在当前光标 / 选区处插入文本（「粘贴」按钮用）。 */
     fun insert(text: String)
 

@@ -11,7 +11,6 @@ import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
 import android.text.Editable
-import android.text.InputType
 import android.text.TextWatcher
 import android.animation.ObjectAnimator
 import android.graphics.Rect
@@ -24,18 +23,18 @@ import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.NumberPicker
 import android.widget.PopupWindow
-import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import kotlin.math.abs
 import com.worldmargin.autospark.app.alarm.DailyAlarm
+import com.worldmargin.autospark.app.alarm.RootShell
 import com.worldmargin.autospark.app.config.BuiltinTemplate
 import com.worldmargin.autospark.app.config.BuiltinTemplates
 import com.worldmargin.autospark.app.config.model.ConversationSnapshot
 import com.worldmargin.autospark.app.config.ConfigCodec
 import com.worldmargin.autospark.app.config.model.ConversationTemplate
-import com.worldmargin.autospark.app.config.model.MacroScript
 import com.worldmargin.autospark.app.config.SparkConfig
 import com.worldmargin.autospark.app.config.model.SparkTag
 import com.worldmargin.autospark.app.config.TransferSelection
@@ -46,7 +45,6 @@ import com.worldmargin.autospark.app.config.withDependencies
 import com.worldmargin.autospark.app.config.model.TemplateGroup
 import com.worldmargin.autospark.app.config.TemplateOps
 import com.worldmargin.autospark.app.config.model.TemplateSource
-import com.worldmargin.autospark.app.config.model.UserFunction
 import com.worldmargin.autospark.app.provider.ConfigContract
 import com.worldmargin.autospark.app.script.PreviewData
 import com.worldmargin.autospark.app.script.SparkScriptEngine
@@ -59,7 +57,6 @@ import com.worldmargin.autospark.app.ui.common.UiKit.COLOR_TEXT
 import com.worldmargin.autospark.app.ui.common.UiKit.COLOR_WARN
 import com.worldmargin.autospark.app.ui.common.UiKit.asClickable
 import com.worldmargin.autospark.app.ui.common.UiKit.actionRow
-import com.worldmargin.autospark.app.ui.common.UiKit.button
 import com.worldmargin.autospark.app.ui.common.UiKit.animateFold
 import com.worldmargin.autospark.app.ui.common.UiKit.bottomBar
 import com.worldmargin.autospark.app.ui.common.UiKit.card
@@ -118,7 +115,6 @@ class SparkSettingsActivity : Activity() {
     private var sparkPage = PAGE_SELECTED
 
     /** 「宏/函数」标签内的分页下标（宏 / 函数）。 */
-    private var functionsPage = PAGE_MACROS
 
     /** 模板页里当前展开的一级模板 id（展开后显示它的派生模板）。 */
     private var expandedTemplateId: String? = null
@@ -662,8 +658,6 @@ class SparkSettingsActivity : Activity() {
                     },
                 )
             }
-
-            SUB_ALARM -> buildAlarmSection(config, body)
 
             SUB_GUIDE -> {
                 val basic = basicSteps(config)
@@ -1479,7 +1473,6 @@ class SparkSettingsActivity : Activity() {
         return page
     }
 
-
     /**
      * 「无火花」分组卡片：没建立火花的会话（days=0）。
      *
@@ -1733,18 +1726,6 @@ class SparkSettingsActivity : Activity() {
             isClickable = true
             setOnClickListener { onClick() }
         }
-
-    /** 会话行里的小标签。 */
-
-    /** 应用搜索关键字：条目按关键字显隐，整组都不匹配就把那张卡片藏掉；顺手记住关键字。 */
-    private fun applyQuery(
-        query: String,
-        groups: List<Pair<View, List<Pair<View, String>>>>,
-        remember: Boolean = true,
-    ) {
-        if (remember) sparkQuery = query
-        filterGroups(query, groups)
-    }
 
     /** 多选后的操作条（没有勾选时隐藏）：计数 + 取消、批量移动。 */
     private fun buildSelectionBar(): View =
@@ -2191,26 +2172,6 @@ class SparkSettingsActivity : Activity() {
         }
     }
 
-    /** 可折叠的段标题（圆角卡片样式，与列表页的分组卡片一致）。 */
-    private fun sectionToggle(
-        title: String,
-        count: String,
-        open: Boolean,
-        onToggle: () -> Unit,
-    ): View =
-        card().apply {
-            isClickable = true
-            setOnClickListener { onToggle() }
-            addView(
-                row().apply {
-                    addView(text(title, 15f, COLOR_TEXT, bold = true))
-                    addView(spacer())
-                    addView(text(count, 13f, COLOR_DIM).apply { setPadding(0, 0, dp(8), 0) })
-                    addView(icon(if (open) UiKit.Icons.FOLD else UiKit.Icons.UNFOLD, 14f, COLOR_DIM))
-                },
-            )
-        }
-
     /**
      * 展开后列出的派生模板（继承自该模板的会话），多层派生按缩进铺开：
      * `A → B → C` 时在 A 下面先列 B，再缩进列 C。
@@ -2555,7 +2516,6 @@ class SparkSettingsActivity : Activity() {
         Toast.makeText(this, "已更新继承关系", Toast.LENGTH_SHORT).show()
         render()
     }
-
 
     private fun openTemplateEditor(groupId: String?) {
         startActivity(
@@ -2959,7 +2919,7 @@ class SparkSettingsActivity : Activity() {
     ) {
         val enabled = config.alarmHour in 0..23
         val at = if (enabled) DailyAlarm.nextTriggerAt(config.alarmHour, config.alarmMinute) else 0L
-        val overlay = DailyAlarm.canStartFromBackground(this)
+        val rootOk = RootShell.hasRoot()
         val exact = DailyAlarm.canScheduleExact(this)
 
         body.addView(
@@ -3004,15 +2964,29 @@ class SparkSettingsActivity : Activity() {
                             }
                         },
                     )
-                    // 缺权限时才露出来，不占地方
-                    if (!overlay) {
+
+                    addView(divider())
+                    addView(
+                        switchRow(
+                            "只在设定时间检查",
+                            if (config.checkAtAlarmOnly)
+                                "平时打开抖音不再扫，只在上面这个时间点附近检查一次"
+                            else "每次打开抖音都会检查一轮（费几秒）",
+                            config.checkAtAlarmOnly,
+                        ) { on ->
+                            ConfigStore.update(this@SparkSettingsActivity) { it.copy(checkAtAlarmOnly = on) }
+                            render()
+                        },
+                    )
+                    // 走 monkey 必须 root。没有就给一条明确的失败提示，不静默降级。
+                    if (!rootOk) {
                         addView(divider())
                         addView(
                             menuRow(
                                 UiKit.Icons.CLOSE,
-                                "缺「后台弹出界面」权限",
-                                "不给的话闹钟响了抖音也起不来，必须开",
-                            ) { openOverlaySettings() },
+                                "未获得 root 授权",
+                                "到 KernelSU / Magisk 里给本应用授权，否则闹钟响了也拉不起抖音",
+                            ) { showRootHint() },
                         )
                     }
                     if (!exact) {
@@ -3036,94 +3010,116 @@ class SparkSettingsActivity : Activity() {
         )
     }
 
-    /** 时 / 分选择：两个滚轮太丑，这里用两个数字输入 + 常用时间快捷键。 */
+    /** 时 / 分选择：两个滚轮并排，点常用时间可直接跳。 */
     private fun pickTime(
         hour: Int,
         minute: Int,
         onPick: (Int, Int) -> Unit,
     ) {
-        val box = column().apply { setPadding(dp(20), dp(8), dp(20), 0) }
-        val hourInput =
-            EditText(this).apply {
-                inputType = InputType.TYPE_CLASS_NUMBER
-                setText(hour.coerceIn(0, 23).toString())
-                textSize = 18f
-                setTextColor(COLOR_TEXT)
-                hint = "小时 0-23"
+        // 两个滚轮并排：左边小时、右边分钟，中间冒号
+        val hourWheel = wheel(0, 23, hour.coerceIn(0, 23))
+        val minuteWheel = wheel(0, 59, minute.coerceIn(0, 59))
+
+        val box =
+            column().apply {
+                setPadding(dp(20), dp(12), dp(20), 0)
+                addView(
+                    row().apply {
+                        gravity = Gravity.CENTER_HORIZONTAL
+                        addView(hourWheel)
+                        addView(
+                            text(":", 26f, COLOR_TEXT, bold = true).apply {
+                                setPadding(dp(14), 0, dp(14), 0)
+                                gravity = Gravity.CENTER
+                            },
+                        )
+                        addView(minuteWheel)
+                    },
+                )
+                addView(
+                    text("常用：", 12f, COLOR_DIM).apply { setPadding(0, dp(14), 0, dp(6)) },
+                )
+                addView(
+                    row().apply {
+                        listOf(0 to 5, 8 to 0, 23 to 30).forEach { (h, m) ->
+                            addView(
+                                iconButton(UiKit.Icons.PLAY, "%02d:%02d".format(h, m), compact = true) {
+                                    hourWheel.value = h
+                                    minuteWheel.value = m
+                                },
+                            )
+                        }
+                    },
+                )
             }
-        val minuteInput =
-            EditText(this).apply {
-                inputType = InputType.TYPE_CLASS_NUMBER
-                setText(minute.coerceIn(0, 59).toString())
-                textSize = 18f
-                setTextColor(COLOR_TEXT)
-                hint = "分钟 0-59"
-            }
-        box.addView(hourInput)
-        box.addView(minuteInput)
-        box.addView(
-            text("常用：", 12f, COLOR_DIM).apply { setPadding(0, dp(10), 0, dp(4)) },
-        )
-        box.addView(
-            row().apply {
-                listOf(0 to 5, 8 to 0, 12 to 0, 23 to 30).forEach { (h, m) ->
-                    addView(
-                        iconButton(UiKit.Icons.PLAY, "%02d:%02d".format(h, m), compact = true) {
-                            hourInput.setText(h.toString())
-                            minuteInput.setText(m.toString())
-                        },
-                    )
-                }
-            },
-        )
+
         AlertDialog
             .Builder(this)
-            .setTitle("每天几点打开抖音")
+            .setTitle("每天几点检查")
             .setView(box)
-            .setPositiveButton("确定") { _, _ ->
-                val h = hourInput.text.toString().toIntOrNull()?.coerceIn(0, 23) ?: hour
-                val m = minuteInput.text.toString().toIntOrNull()?.coerceIn(0, 59) ?: minute
-                onPick(h, m)
-            }
+            .setPositiveButton("确定") { _, _ -> onPick(hourWheel.value, minuteWheel.value) }
             .setNegativeButton("取消", null)
             .show()
     }
 
+    /** 造一个滚轮。样式跟着本项目的浅色卡片走，不用 Material 主题。 */
+    private fun wheel(
+        min: Int,
+        max: Int,
+        value: Int,
+    ): NumberPicker =
+        NumberPicker(this).apply {
+            this.minValue = min
+            this.maxValue = max
+            this.value = value
+            wrapSelectorWheel = true
+            descendantFocusability = NumberPicker.FOCUS_BLOCK_DESCENDANTS
+            layoutParams = LinearLayout.LayoutParams(dp(88), LinearLayout.LayoutParams.WRAP_CONTENT)
+            // 分隔线改成低对比灰，默认的蓝色在浅底上太扎眼
+            runCatching {
+                val field = NumberPicker::class.java.getDeclaredField("mSelectionDivider")
+                field.isAccessible = true
+                field.set(this, android.graphics.drawable.ColorDrawable(0x33000000))
+            }
+            // 滚轮里的数字沿用本项目字色与字号
+            for (i in 0 until childCount) {
+                val child = getChildAt(i) as? EditText ?: continue
+                child.setTextColor(COLOR_TEXT)
+                child.textSize = 22f
+            }
+        }
+
     private fun formatClock(at: Long): String =
         if (at <= 0L) "未安排" else SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(at))
 
-    /** 申请悬浮窗 + 精确闹钟 + 忽略电池优化（三个都拿不到也能用，只是可能被系统压）。 */
+    /** 检查 root + 精确闹钟。悬浮窗已不再需要（走 monkey，不靠 startActivity）。 */
     private fun requestAlarmPermissions() {
-        if (!DailyAlarm.canStartFromBackground(this)) {
-            AlertDialog
-                .Builder(this)
-                .setTitle("还需要「后台弹出界面」权限")
-                .setMessage(
-                    "Android 10 起禁止应用在后台启动界面。要让闹钟真的把抖音拉起来，" +
-                        "必须给本模块「显示在其他应用上层」（悬浮窗）权限。\n\n" +
-                        "点「去开启」跳到系统设置，找到「抖音续火花cc」打开即可。",
-                )
-                .setPositiveButton("去开启") { _, _ -> openOverlaySettings() }
-                .setNegativeButton("稍后", null)
-                .show()
+        if (!RootShell.hasRoot()) {
+            showRootHint()
         } else if (!DailyAlarm.canScheduleExact(this)) {
             openExactAlarmSettings()
         }
     }
 
-    private fun openOverlaySettings() {
-        val ok =
-            runCatching {
-                startActivity(
-                    Intent(
-                        android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                        android.net.Uri.parse("package:$packageName"),
-                    ),
-                )
-            }.isSuccess
-        if (!ok) {
-            runCatching { startActivity(Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION)) }
-        }
+    /**
+     * 没 root 时的说明。
+     *
+     * 定时唤醒走的是 `monkey`，只有 root 或 shell 身份能跑。普通 App 身份执行会被
+     * 系统直接 `Killed`，所以这里不提供任何降级方案，直接告诉用户去授权。
+     */
+    private fun showRootHint() {
+        AlertDialog
+            .Builder(this)
+            .setTitle("需要 root 授权")
+            .setMessage(
+                "定时打开抖音用的是 monkey 命令，只有 root 身份能执行。" +
+                    "普通应用身份跑会被系统直接杀掉。\n\n" +
+                    "请到 KernelSU / Magisk 管理器里给「抖音续火花cc」授权 root，" +
+                    "然后回到这里重新打开开关。\n\n" +
+                    "授权后不需要重启手机。",
+            )
+            .setPositiveButton("知道了", null)
+            .show()
     }
 
     private fun openExactAlarmSettings() {
@@ -3584,32 +3580,6 @@ class SparkSettingsActivity : Activity() {
             .getOrElse { "（预览失败：" + (it.message ?: it.toString()) + "）" }
     }
 
-    /** 把一行包成卡片（圆角浅底，卡片之间留 8dp），替代生硬的横线分隔。 */
-    private fun cardRow(item: View): View =
-        column().apply {
-            background = rounded(COLOR_CARD, 12)
-            setPadding(dp(14), dp(2), dp(14), dp(2))
-            layoutParams =
-                LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                ).apply { bottomMargin = dp(8) }
-            addView(item)
-        }
-
-    /** 把列表行以卡片形式加进页面；筛选时整张卡片一起显隐。 */
-    private fun addCards(
-        body: LinearLayout,
-        rows: MutableList<View>,
-        items: List<View>,
-    ) {
-        items.forEach { item ->
-            val card = cardRow(item)
-            body.addView(card)
-            rows += card
-        }
-    }
-
     // -------------------------------------------------------------------- 设置
 
     /**
@@ -3701,14 +3671,6 @@ class SparkSettingsActivity : Activity() {
             "手动移入 ${config.forcedRenew.size} 个 / 移出 ${config.forcedSkip.size} 个"
         }
 
-    private fun alarmSummary(config: SparkConfig): String {
-        if (config.alarmHour !in 0..23) return "关闭"
-        val at = DailyAlarm.nextTriggerAt(config.alarmHour, config.alarmMinute)
-        val clock = "%02d:%02d".format(config.alarmHour, config.alarmMinute)
-        val overlay = if (DailyAlarm.canStartFromBackground(this)) "" else " · 缺悬浮窗权限"
-        return "每天 $clock · 下次 ${formatClock(at)}$overlay"
-    }
-
     private fun hostSummary(config: SparkConfig): String =
         if (config.hostNoteAt == 0L) {
             "无记录"
@@ -3736,19 +3698,6 @@ class SparkSettingsActivity : Activity() {
     private fun versionName(): String =
         runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull() ?: "未知"
 
-    private fun confirmClearManual() {
-        AlertDialog
-            .Builder(this)
-            .setTitle("清除手动移动标记？")
-            .setMessage("清除后，全部会话重新按抖音的火花状态自动判定归属。")
-            .setPositiveButton("清除") { _, _ ->
-                ConfigStore.update(this) { it.copy(forcedRenew = emptySet(), forcedSkip = emptySet()) }
-                Toast.makeText(this, "已清除手动标记", Toast.LENGTH_SHORT).show()
-                render()
-            }.setNegativeButton("取消", null)
-            .show()
-    }
-
     companion object {
         val TABS = listOf("续火花", "模板", "设置")
         val TAB_ICONS =
@@ -3763,13 +3712,11 @@ class SparkSettingsActivity : Activity() {
             linkedMapOf(
                 SUB_OVERVIEW to "概览",
                 SUB_ASSIGN to "手动归属",
-                SUB_EDITOR to "编辑器",
                 SUB_CONFIG to "配置",
                 SUB_EXPORT to "导出配置",
                 SUB_IMPORT to "导入配置",
                 SUB_HOST to "宿主状态",
                 SUB_GUIDE to "新手引导",
-                SUB_ALARM to "定时唤醒",
                 SUB_ABOUT to "关于",
             )
 
@@ -3787,14 +3734,12 @@ class SparkSettingsActivity : Activity() {
 
         const val SUB_OVERVIEW = "overview"
         const val SUB_ASSIGN = "assign"
-        const val SUB_EDITOR = "editor"
         const val SUB_CONFIG = "config"
         const val SUB_EXPORT = "export"
         const val SUB_IMPORT = "import"
         const val SUB_HOST = "host"
         const val SUB_GUIDE = "guide"
         const val SUB_ABOUT = "about"
-        const val SUB_ALARM = "alarm"
 
         /** 手动发送等回执的超时（抖音没运行时不至于一直等）。 */
         const val SEND_TIMEOUT_MS = 12_000L
