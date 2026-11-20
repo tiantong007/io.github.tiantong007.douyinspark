@@ -4,7 +4,9 @@ plugins {
     alias(libs.plugins.agp.app)
 }
 
-val gitCommitCount = 1
+// ===== 版本号唯一真源：发版只改这两行 =====
+val appVersionCode = 20006
+val appVersionName = "v2.1.2"
 
 // 签名信息读取自根目录 release-signing.properties（不入库），缺失时不签名
 val releaseSigning =
@@ -33,8 +35,9 @@ android {
         minSdk = 26
         targetSdk = 36
         // 固定版本号：历史压缩后提交数会变小，不能再拿它当 versionCode（会触发降级安装失败）
-        versionCode = 20005
-        versionName = "v2.1.1"
+        // 真源在文件顶部 appVersionCode / appVersionName，这里只引用
+        versionCode = appVersionCode
+        versionName = appVersionName
     }
 
     // 按 ABI 分包：arm64-v8a / armeabi-v7a 各出一个 APK

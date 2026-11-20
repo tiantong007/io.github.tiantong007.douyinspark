@@ -4,7 +4,8 @@
 
 **一句话**：给「抖音判定今天还没互动」的会话，自动发一条你自己写的私信，每个会话每天最多一条。
 
-**版本 v2.0.0**（versionCode 20001）· Android 9+ / Root / LSPosed 2.x · 仅 arm64-v8a
+<!-- version-anchor: v2.1.2 (20006) -->
+**版本 v2.1.2**（versionCode 20006）· Android 9+ / Root / LSPosed 2.x · 仅 arm64-v8a
 
 ---
 
