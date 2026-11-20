@@ -1872,7 +1872,12 @@ class SparkSettingsActivity : Activity() {
                         LinearLayout.LayoutParams(dp(44), dp(44)).apply { marginEnd = dp(12) }
                     scaleType = ImageView.ScaleType.CENTER_CROP
                 }
-            AvatarLoader.load(this@SparkSettingsActivity, avatar, snapshot.peerUid, snapshot.displayName)
+            AvatarLoader.load(
+                this@SparkSettingsActivity,
+                avatar,
+                snapshot.peerUid.ifBlank { snapshot.conversationId },
+                snapshot.displayName,
+            )
             addView(avatar)
             addView(
                 column().apply {
@@ -2660,7 +2665,12 @@ class SparkSettingsActivity : Activity() {
                         LinearLayout.LayoutParams(dp(36), dp(36)).apply { marginEnd = dp(10) }
                     scaleType = ImageView.ScaleType.CENTER_CROP
                 }
-            AvatarLoader.load(this@SparkSettingsActivity, avatar, snapshot?.peerUid.orEmpty(), config.conversationLabel(conversationId))
+            AvatarLoader.load(
+                this@SparkSettingsActivity,
+                avatar,
+                snapshot?.peerUid?.ifBlank { conversationId }.orEmpty(),
+                config.conversationLabel(conversationId),
+            )
             addView(avatar)
             addView(
                 column().apply {

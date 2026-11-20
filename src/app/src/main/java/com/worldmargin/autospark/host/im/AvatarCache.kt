@@ -5,21 +5,21 @@ import android.os.Bundle
 import com.worldmargin.autospark.app.config.ConfigClient
 import com.worldmargin.autospark.core.ModLog
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 import java.security.MessageDigest
 
 /**
- * 会话头像：从抖音自己的本地缓存读取后推给模块 App。
+ * 会话头像：在抖音进程里准备好图片字节，经 [ConfigClient.putAvatars] 推给模块 App。
  *
- * 模块不申请 `INTERNET`，`AvatarLoader` 只读 `cacheDir/avatars/<uid 的 md5>.png`；
- * 缓存会因卸载 / 更新丢掉，且抖音里换头像后内容会变。所以宿主在刷新快照时，
- * 直接从抖音的头像缓存目录按 URL 末段找文件、推给模块覆盖写入：
+ * 模块自身**不申请 `INTERNET`**（`AvatarLoader` 只读 `cacheDir/avatars/<uid 的 md5>.png`），
+ * 但抖音进程本来就有网络权限，所以取图这一步放在宿主侧做，模块一个字节都不用联网：
  *
- * 1. 断网可用 —— 读的是抖音已缓存的图片，不发任何网络请求；
- * 2. 内容变更自动跟上 —— 每次刷新都推，抖音缓存更新后文件字节就变了；
- * 3. 找不到缓存的（抖音还没加载过）跳过，等下次刷新。
- *
- * 抖音缓存目录：`files/tc_effect/aweme/720x720/aweme-avatar/<url 末段>.jpeg`，
- * 文件名就是头像 URL 的最后一段，实测一一对应。
+ * 1. 先找抖音自己的头像缓存 `files/tc_effect/aweme/720x720/aweme-avatar/<url 末段>`，
+ *    命中就不发请求（断网也能显示常聊会话的头像）；
+ * 2. 没命中才用宿主进程的网络下载一次（8 秒超时，单张上限 512 KB）；
+ * 3. 模块侧按 uid 存盘并记录来源 URL，URL 没变的不会重复覆盖写入 —— 所以
+ *    「宿主反复刷新快照」不会变成「反复下载 + 反复跨进程写」。
  *
  * key 规则与模块 `AvatarLoader.fileName` 一致：uid 的 UTF-8 MD5 十六进制。
  */
@@ -30,12 +30,19 @@ object AvatarCache {
     /** 单次 IPC 的图片总量上限，避免撞 binder 的 1MB transaction 限制。 */
     private const val BATCH_BYTES = 200 * 1024
 
+    /** 单张上限：超出多半不是头像（错误页/大图），直接放弃。 */
+    private const val MAX_IMAGE_BYTES = 512 * 1024
+
+    private const val CONNECT_TIMEOUT_MS = 8_000
+    private const val READ_TIMEOUT_MS = 8_000
+    private const val USER_AGENT = "Mozilla/5.0 (Linux; Android 14)"
+
     /**
-     * 把抖音已缓存的头像推给模块。返回本次推送的张数。
+     * 把头像推给模块。返回本次推送的张数。
      *
      * [items] 是 (uid, url) 对：
      * - uid 是稳定标识，用作模块侧缓存 key —— 换头像 / URL 参数变化都不影响命中；
-     * - url 只用来在抖音缓存目录里定位文件（文件名就是 URL 末段）。
+     * - url 用来定位抖音缓存文件，也用于模块侧判断「这张图是不是已经是最新的」。
      */
     fun sync(
         context: Context,
@@ -46,36 +53,62 @@ object AvatarCache {
         // 抖音的 files 目录：宿主进程跑在抖音内，applicationInfo 就是抖音的
         val source =
             runCatching { File(context.applicationInfo.dataDir, "files/$DOUYIN_AVATAR_DIR") }
-                .getOrNull() ?: return 0
-        if (!source.isDirectory) return 0
+                .getOrNull()
+                ?.takeIf { it.isDirectory }
 
         var pushed = 0
         var batch = Bundle()
+        var urls = Bundle()
         var batchBytes = 0
         for ((uid, url) in items) {
             if (uid.isBlank() || url.isBlank()) continue
-            // 末段可能带查询参数（?from=...），先去掉再匹配磁盘文件名
-            val name =
-                url.trim().substringAfterLast('/').substringBefore('?').takeIf { it.isNotBlank() }
-                    ?: continue
-            val file = File(source, if (name.endsWith(".jpeg") || name.endsWith(".jpg")) name else "$name.jpeg")
-            if (!file.isFile) continue
-            val bytes = runCatching { file.readBytes() }.getOrNull() ?: continue
-            if (bytes.isEmpty() || bytes.size > 512 * 1024) continue
-            batch.putByteArray(keyOf(uid), bytes)
+            val bytes = readCached(source, url) ?: download(url) ?: continue
+            val key = keyOf(uid)
+            batch.putByteArray(key, bytes)
+            urls.putString(key, url)
             batchBytes += bytes.size
             if (batchBytes >= BATCH_BYTES) {
-                if (ConfigClient.putAvatars(context, batch)) pushed += batch.keySet().size
+                pushed += ConfigClient.putAvatars(context, batch, urls).coerceAtLeast(0)
                 batch = Bundle()
+                urls = Bundle()
                 batchBytes = 0
             }
         }
         if (batch.keySet().isNotEmpty()) {
-            if (ConfigClient.putAvatars(context, batch)) pushed += batch.keySet().size
+            pushed += ConfigClient.putAvatars(context, batch, urls).coerceAtLeast(0)
         }
         if (pushed > 0) ModLog.i("头像同步 $pushed 张（按 uid 对应）")
         return pushed
     }
+
+    /** 抖音已经缓存过的头像文件；末段可能带查询参数（`?from=...`），先去掉再匹配文件名。 */
+    private fun readCached(
+        dir: File?,
+        url: String,
+    ): ByteArray? {
+        if (dir == null) return null
+        val name = url.trim().substringAfterLast('/').substringBefore('?').takeIf { it.isNotBlank() } ?: return null
+        val file = File(dir, if (name.endsWith(".jpeg") || name.endsWith(".jpg")) name else "$name.jpeg")
+        if (!file.isFile) return null
+        return runCatching { file.readBytes() }.getOrNull()?.takeIf { it.isNotEmpty() && it.size <= MAX_IMAGE_BYTES }
+    }
+
+    /** 在宿主进程里下载一张头像（抖音有 INTERNET 权限，模块没有）。 */
+    private fun download(url: String): ByteArray? =
+        runCatching {
+            val connection = URL(url).openConnection() as HttpURLConnection
+            try {
+                connection.connectTimeout = CONNECT_TIMEOUT_MS
+                connection.readTimeout = READ_TIMEOUT_MS
+                connection.setRequestProperty("User-Agent", USER_AGENT)
+                connection.instanceFollowRedirects = true
+                if (connection.responseCode !in 200..299) return null
+                val bytes = connection.inputStream.use { it.readBytes() }
+                bytes.takeIf { it.isNotEmpty() && it.size <= MAX_IMAGE_BYTES }
+            } finally {
+                connection.disconnect()
+            }
+        }.getOrNull()
 
     private fun keyOf(uid: String): String =
         MessageDigest

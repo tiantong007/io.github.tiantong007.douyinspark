@@ -79,17 +79,29 @@ object ConfigClient {
     /**
      * 推送一批会话头像给模块进程落盘（Bundle key = uid 的 MD5，value = 图片字节）。
      *
-     * 模块不申请 `INTERNET`，头像只能由宿主从抖音自己的缓存里读出来后推过去。
+     * 模块不申请 `INTERNET`，头像由宿主准备字节后推过去。[urls] 用于让模块侧跳过
+     * 「地址没变」的重复写入。
+     *
+     * @return 实际写入张数；通道不可用时返回 -1
      */
     fun putAvatars(
         context: Context,
         images: Bundle,
-    ): Boolean =
+        urls: Bundle,
+    ): Int =
         runCatching {
-            val extras = Bundle().apply { putBundle(ConfigContract.KEY_IMAGES, images) }
-            context.contentResolver.call(ConfigContract.URI, ConfigContract.METHOD_PUT_AVATARS, null, extras)
-                ?.getBoolean(ConfigContract.KEY_OK) == true
-        }.getOrDefault(false)
+            val extras =
+                Bundle().apply {
+                    putBundle(ConfigContract.KEY_IMAGES, images)
+                    putBundle(ConfigContract.KEY_URLS, urls)
+                }
+            val result = context.contentResolver.call(ConfigContract.URI, ConfigContract.METHOD_PUT_AVATARS, null, extras)
+            if (result?.getBoolean(ConfigContract.KEY_OK) == true) {
+                result.getInt(ConfigContract.KEY_WRITTEN)
+            } else {
+                -1
+            }
+        }.getOrDefault(-1)
 
     fun putSnapshots(
         context: Context,

@@ -467,7 +467,13 @@ object AutoSparkBridge {
         // 顺带把头像推过去：模块不申请 INTERNET，只能用抖音已经缓存好的图片。
         // 失败不影响快照（拿不到就显示首字占位图），所以不改变 RefreshOutcome。
         runCatching {
-            AvatarCache.sync(context, snapshots.map { it.peerUid to it.avatar }.filter { it.first.isNotBlank() && it.second.isNotBlank() })
+            // 群聊没有 peerUid，退回用 conversationId 当 key（模块侧 AvatarLoader 用同一规则）
+            AvatarCache.sync(
+                context,
+                snapshots
+                    .map { it.peerUid.ifBlank { it.conversationId } to it.avatar }
+                    .filter { it.first.isNotBlank() && it.second.isNotBlank() },
+            )
         }.onFailure { ModLog.w("头像同步失败", it) }
         // 快照落盘后按保留策略清理：不在已选目标里的会话，模板与发送记录按 30 天宽限期清掉
         ConfigClient.prune(context, now)

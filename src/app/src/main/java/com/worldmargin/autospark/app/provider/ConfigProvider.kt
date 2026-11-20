@@ -86,6 +86,12 @@ object ConfigContract {
     /** 头像图片 Bundle（key = uid 的 MD5，value = byte[]）。 */
     const val KEY_IMAGES = "images"
 
+    /** 头像来源 URL Bundle（key 同上，value = 该头像的下载地址），用于跳过没变的图。 */
+    const val KEY_URLS = "urls"
+
+    /** 本次实际写入的张数（int）—— 与请求张数的差就是「URL 没变、跳过」的数量。 */
+    const val KEY_WRITTEN = "written"
+
     /**
      * 抖音进程 → 本模块进程：唤醒。
      *
@@ -177,7 +183,12 @@ class ConfigProvider : ContentProvider() {
 
             ConfigContract.METHOD_PUT_AVATARS -> {
                 val images = extras?.getBundle(ConfigContract.KEY_IMAGES)
-                Bundle().apply { putBoolean(ConfigContract.KEY_OK, images != null && writeAvatars(context, images)) }
+                val urls = extras?.getBundle(ConfigContract.KEY_URLS) ?: Bundle()
+                val written = if (images == null) -1 else writeAvatars(context, images, urls)
+                Bundle().apply {
+                    putBoolean(ConfigContract.KEY_OK, written >= 0)
+                    putInt(ConfigContract.KEY_WRITTEN, written.coerceAtLeast(0))
+                }
             }
 
             else -> Bundle().apply { putBoolean(ConfigContract.KEY_OK, false) }
@@ -185,29 +196,42 @@ class ConfigProvider : ContentProvider() {
     }
 
     /**
-     * 把一批头像字节落盘到 `cacheDir/avatars/<key>.png`。
+     * 把一批头像字节落盘到 `cacheDir/avatars/<key>.png`，旁边记一份 `<key>.url` 记来源地址。
      *
      * key 只接受 32 位小写十六进制（AvatarLoader.fileName 产出的形状），单张上限 512 KB：
      * 宿主是被 hook 的进程，这一层不能无条件信任它的输入。
+     *
+     * **[urls] 里地址与 `<key>.url` 相同、且 png 已存在时跳过写入** —— 宿主每次刷新会话都会
+     * 推一遍头像，不跳过就是「每秒都在重写同一批文件」，白耗 IO 还会让缓存目录频繁变更。
+     *
+     * @return 实际写入张数；-1 表示有非法条目（其余合法条目照常写入）
      */
     private fun writeAvatars(
         context: Context,
         images: Bundle,
-    ): Boolean {
+        urls: Bundle,
+    ): Int {
         var ok = true
+        var written = 0
         val dir = File(context.cacheDir, "avatars")
         images.keySet().forEach { key ->
             val bytes = images.getByteArray(key)
-            if (HEX32.matches(key) && bytes != null && bytes.isNotEmpty() && bytes.size <= 512 * 1024) {
-                runCatching {
-                    dir.mkdirs()
-                    File(dir, "$key.png").writeBytes(bytes)
-                }.onFailure { ok = false }
-            } else {
+            if (!HEX32.matches(key) || bytes == null || bytes.isEmpty() || bytes.size > 512 * 1024) {
                 ok = false
+                return@forEach
             }
+            val png = File(dir, "$key.png")
+            val marker = File(dir, "$key.url")
+            val url = urls.getString(key).orEmpty()
+            if (png.isFile && url.isNotEmpty() && runCatching { marker.readText() }.getOrNull() == url) return@forEach
+            runCatching {
+                dir.mkdirs()
+                png.writeBytes(bytes)
+                if (url.isNotEmpty()) marker.writeText(url) else marker.delete()
+                written++
+            }.onFailure { ok = false }
         }
-        return ok
+        return if (ok) written else -1
     }
 
     private companion object {
