@@ -6,8 +6,8 @@ plugins {
 }
 
 // ===== 版本号唯一真源：发版只改这两行 =====
-val appVersionCode = 20007
-val appVersionName = "v2.1.3"
+val appVersionCode = 20008
+val appVersionName = "v2.2.0"
 
 // 签名信息读取自根目录 release-signing.properties（不入库），缺失时不签名
 val releaseSigning =

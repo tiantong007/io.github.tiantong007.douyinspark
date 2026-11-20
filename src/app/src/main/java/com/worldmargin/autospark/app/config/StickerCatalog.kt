@@ -39,4 +39,27 @@ object StickerCatalog {
     fun byName(name: String): String? = CONTENT[name.trim()]
 
     fun names(): List<String> = CONTENT.keys.toList()
+
+    /**
+     * 用抖音当前下发的图片地址，套我们抓包拿到的**全量字段**拼 content。
+     *
+     * keva 里只有 `display_name` / `static_url` / `animate_url` / `biz_type` 四项，
+     * 其余字段（`emoji_type`、`sticker_type`、`aweType` 等）是抖音 IM 侧解析时真正要的，
+     * 上游那套精简 content 在个别机型上会被拒，所以这里以抓包模板为底，只替换名字与地址。
+     *
+     * @param name 表情名（`display_name`）
+     * @param url 抖音当前下发的静态图地址（带有效签名）
+     * @return 拼好的 content JSON；模板解析失败返回 null（调用方退回硬编码）
+     */
+    fun contentWithUrl(name: String, url: String): String? {
+        if (name.isBlank() || url.isBlank()) return null
+        val template = CONTENT.values.firstOrNull() ?: return null
+        val root = runCatching { org.json.JSONObject(template) }.getOrNull() ?: return null
+        val link = root.optJSONObject("url") ?: return null
+        link.put("uri", url)
+        link.put("url_list", org.json.JSONArray().put(url))
+        root.put("display_name", name.trim())
+        root.put("id", name.trim())
+        return root.toString()
+    }
 }

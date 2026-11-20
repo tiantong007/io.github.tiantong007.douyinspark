@@ -93,8 +93,23 @@ object PreviewData {
             templateInfo = templateInfo.toString(),
             macroNames = macroNames(config),
             info = info.toString(),
+            stickers = stickerPreview(),
             preview = true,
         )
+    }
+
+    /**
+     * 预览用的贴纸目录。
+     *
+     * 预览跑在模块自己的进程里，读不到抖音的 keva 策略，所以只能给出**名字**（取自硬编码目录），
+     * `static` / `animate` 为空——预览只看文案，不会真的发贴纸。
+     */
+    private fun stickerPreview(): String {
+        val array = JSONArray()
+        com.worldmargin.autospark.app.config.StickerCatalog.names().forEach { name ->
+            array.put(JSONObject().put("name", name).put("static", "").put("animate", ""))
+        }
+        return array.toString()
     }
 
     /** 数组按某个字段转成 `{id: 对象}` 的表，供 `getXxx(id)` 查。 */

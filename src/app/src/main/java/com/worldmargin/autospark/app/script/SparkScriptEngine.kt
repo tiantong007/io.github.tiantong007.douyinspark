@@ -7,6 +7,7 @@ import org.mozilla.javascript.ClassShutter
 import org.mozilla.javascript.Context
 import org.mozilla.javascript.ContextFactory
 import org.mozilla.javascript.Function
+import org.mozilla.javascript.RhinoException
 import org.mozilla.javascript.Scriptable
 import org.mozilla.javascript.ScriptableObject
 import org.mozilla.javascript.Undefined
@@ -41,6 +42,16 @@ class EmptyResultException(
 object SparkScriptEngine {
     private const val TIMEOUT_MS = 2_000L
     private const val OBSERVER_THRESHOLD = 100_000
+
+    /** 报错里显示的脚本名（Rhino 的 sourceName）。 */
+    private const val SOURCE_NAME = "脚本"
+
+    /**
+     * [renderFull] 拼接的 program 里，用户脚本第一行之前有 4 行：
+     * `ctx.result = []` / `__sb.result0 = …` / `__sparkInitResult(…)` / `try {`。
+     * 用来把 Rhino 报的行号换算回用户自己编辑框里的行号 —— 不校正的话第 1 行报错会变成第 5 行。
+     */
+    private const val SCRIPT_LINE_OFFSET = 4
 
     /** 脚本上下文对象名。 */
     const val CTX = "ctx"
@@ -104,6 +115,12 @@ object SparkScriptEngine {
         val macroNames: String = "{}",
         /** 按 id 取信息的数据：`{conversations:{id:..}, templates:{id:..}, macros:{id:..}}`。 */
         val info: String = "{}",
+        /** 互动贴纸目录：`[{name,static,animate}]`（`ctx.sticker.list()` 用）。 */
+        val stickers: String = "[]",
+        /** 每个会话最多 commit 几段（含贴纸段）；超出后并入最后一段文本。 */
+        val maxCommits: Int = 3,
+        /** 贴纸 push 行为：`split` / `stickerOnly` / `appendLast` / `prependFirst`。 */
+        val stickerPushMode: String = "split",
         /**
          * 预览 / 试算模式：**不触发任何会改数据的动作**
          *（写变量、删变量、挂载 / 摘掉宏），只把文案算出来。
@@ -115,6 +132,25 @@ object SparkScriptEngine {
         }
     }
 
+    /**
+     * 一段待发送内容：文本或互动贴纸。
+     *
+     * 脚本用 `ctx.commit()` 切段、`ctx.result.push({type:"sticker", name:"续火花"})` 插贴纸，
+     * 引擎把这些整理成有序的段列表，宿主按段发（都是同一条会话里的多条消息）。
+     */
+    data class SendSegment(
+        /** `text` 或 `sticker`。 */
+        val kind: String,
+        /** 文本段的正文（贴纸段为空）。 */
+        val text: String = "",
+        /** 贴纸名（`sticker` 段）。 */
+        val name: String = "",
+        /** 贴纸 id（`sticker` 段，可空）。 */
+        val id: String = "",
+        /** 段句柄 `seg-N`，脚本用 `ctx.segment(handle)` 查状态。 */
+        val handle: String = "",
+    )
+
     /** 渲染结果：文案 + 脚本对沙盒与宏的改动（由调用方落盘）。 */
     data class Rendered(
         val text: String,
@@ -124,6 +160,8 @@ object SparkScriptEngine {
         val macroOps: List<MacroOp>,
         /** 脚本用 `ctx.registerCallback` 注册的会话结果回调（发送后由宿主触发）。 */
         val callbacks: List<Function> = emptyList(),
+        /** 分段发送内容（文本 / 贴纸）；为空时按 [text] 发一条。 */
+        val segments: List<SendSegment> = emptyList(),
     )
 
     /**
@@ -163,7 +201,7 @@ object SparkScriptEngine {
     fun render(
         script: String,
         values: Map<String, Any?>,
-    ): String = renderFull(script, values, SandboxEnv.EMPTY.copy(preview = true), "", "").text
+    ): String = previewText(renderFull(script, values, SandboxEnv.EMPTY.copy(preview = true), "", ""))
 
     /**
      * 预览用重载：数据由 [PreviewData] 造好（只带正在预览的那个会话），
@@ -173,7 +211,26 @@ object SparkScriptEngine {
         script: String,
         values: Map<String, Any?>,
         env: SandboxEnv,
-    ): String = renderFull(script, values, env.copy(preview = true), "", "").text
+    ): String = previewText(renderFull(script, values, env.copy(preview = true), "", ""))
+
+    /**
+     * 预览文案：文本段原样，贴纸段标成 `[互动表情：名字]`。
+     *
+     * 预览只是给人看「会发出什么」，不能真的发贴纸，标注一下比悄悄吞掉更好懂。
+     * 没有分段（老脚本）时退回引擎拼好的整段文本。
+     */
+    private fun previewText(rendered: Rendered): String {
+        if (rendered.segments.isEmpty()) return rendered.text
+        val lines =
+            rendered.segments.mapNotNull { segment ->
+                when (segment.kind) {
+                    "text" -> segment.text
+                    "sticker" -> "[互动表情：" + segment.name + "]"
+                    else -> null
+                }
+            }.filter { it.isNotBlank() }
+        return if (lines.isEmpty()) rendered.text else lines.joinToString("\n")
+    }
 
     /**
      * 执行脚本，取回文案与沙盒改动。
@@ -197,6 +254,9 @@ object SparkScriptEngine {
             cx.languageVersion = Context.VERSION_ES6
             cx.setClassShutter(denyJava)
             cx.instructionObserverThreshold = OBSERVER_THRESHOLD
+            // Rhino 报错要查资源包取文案，打包进 APK 后这一步会失败，把真实错误盖成
+            // "Can't find bundle ..."；换成自己的 provider 才能看到脚本到底哪里错了
+            RhinoMessages.install()
 
             val scope = cx.initStandardObjects()
             val ctxObject = cx.newObject(scope)
@@ -224,6 +284,9 @@ object SparkScriptEngine {
             ScriptableObject.putProperty(state, "tplJson", env.templateInfo)
             ScriptableObject.putProperty(state, "namesJson", env.macroNames)
             ScriptableObject.putProperty(state, "infoJson", env.info)
+            ScriptableObject.putProperty(state, "stickersJson", env.stickers)
+            ScriptableObject.putProperty(state, "maxCommits", env.maxCommits)
+            ScriptableObject.putProperty(state, "stickerPushMode", env.stickerPushMode)
             ScriptableObject.putProperty(state, "preview", env.preview)
             ScriptableObject.putProperty(state, "convJson", env.conversations)
             ScriptableObject.putProperty(scope, SANDBOX_STATE_VAR, state)
@@ -238,21 +301,43 @@ object SparkScriptEngine {
             val program =
                 "$CTX.$RESULT_OBJ = [];\n" +
                     "__sb.result0 = $CTX.$RESULT_OBJ;\n" +
+                    "__sparkInitResult($CTX.$RESULT_OBJ);\n" +
+                    "try {\n" +
                     script +
-                    "\n;\n" +
+                    "\n} catch (__sparkErr) { if (!(__sparkErr && __sparkErr.__sparkStop)) throw __sparkErr; }\n" +
+                    ";\n" +
                     "__sparkSyncResult();\n" +
-                    "(typeof $CTX.$RESULT_OBJ === 'undefined' || $CTX.$RESULT_OBJ == null)" +
-                    " ? undefined : $CTX.$RESULT_OBJ;"
-            val result = cx.evaluateString(scope, program, "autospark", 1, null)
+                    "__sparkFinalize();"
+            val result =
+                try {
+                    cx.evaluateString(scope, program, SOURCE_NAME, 1, null)
+                } catch (rhino: RhinoException) {
+                    // Rhino 记的是「整个 program 里的第几行」，减掉前置行才是用户自己的行号
+                    val line = rhino.lineNumber() - SCRIPT_LINE_OFFSET
+                    // Rhino 的 getMessage() 是「文案 (脚本#行号)」，这里换成中文直白说法；
+                    // details() 是没拼行号的那半句，正是要给人看的
+                    val where = if (line > 0) "第 $line 行出错" else "运行出错"
+                    throw IllegalStateException("脚本$where：${rhino.details()}", rhino)
+                }
             if (result == null || result == Scriptable.NOT_FOUND || result == Undefined.instance) {
                 throw IllegalStateException("脚本没有给 ctx.result 赋值")
             }
-            val text = flatten(result).trim()
             val changes = collectChanges(cx, scope)
             val callbacks = collectCallbacks(scope)
+            val segments = parseSegments(Context.toString(result))
+            val text = segments.filter { it.kind == "text" }.joinToString("\n") { it.text }.trim()
             // 空结果按「跳过」处理（文档口径：空列表 = 这条不发），把回调一起带出去，宿主可以回一个 Skipped
-            if (text.isEmpty()) throw EmptyResultException("ctx.result 是空的（没有内容可发送）", callbacks)
-            return Rendered(text, changes.writes, changes.deletes, changes.ops, callbacks)
+            if (text.isEmpty() && segments.none { it.kind == "sticker" }) {
+                throw EmptyResultException("ctx.result 是空的（没有内容可发送）", callbacks)
+            }
+            return Rendered(
+                text = text,
+                sandboxWrites = changes.writes,
+                sandboxDeletes = changes.deletes,
+                macroOps = changes.ops,
+                callbacks = callbacks,
+                segments = segments,
+            )
         } finally {
             Context.exit()
         }
@@ -330,6 +415,7 @@ object SparkScriptEngine {
         conversationId: String,
         result: String,
         reason: String = "",
+        segmentsJson: String = "",
     ): Rendered {
         if (callbacks.isEmpty()) return Rendered("", emptyList(), emptyList(), emptyList())
         val scope = callbacks.first().parentScope ?: return Rendered("", emptyList(), emptyList(), emptyList())
@@ -344,6 +430,26 @@ object SparkScriptEngine {
             ScriptableObject.putProperty(argument, "id", conversationId)
             ScriptableObject.putProperty(argument, "result", result)
             if (reason.isNotBlank()) ScriptableObject.putProperty(argument, "reason", reason)
+            // 分段发送的逐段结果：`[{handle, kind, ok, name?, reason?}]`，脚本可用 ctx.segment(handle) 查
+            if (segmentsJson.isNotBlank()) {
+                runCatching {
+                    val status = cx.newObject(scope)
+                    val array = org.json.JSONArray(segmentsJson)
+                    for (i in 0 until array.length()) {
+                        val item = array.optJSONObject(i) ?: continue
+                        val entry = cx.newObject(scope)
+                        ScriptableObject.putProperty(entry, "handle", item.optString("handle"))
+                        ScriptableObject.putProperty(entry, "kind", item.optString("kind"))
+                        ScriptableObject.putProperty(entry, "ok", item.optBoolean("ok"))
+                        ScriptableObject.putProperty(entry, "name", item.optString("name"))
+                        ScriptableObject.putProperty(entry, "reason", item.optString("reason"))
+                        ScriptableObject.putProperty(status, item.optString("handle"), entry)
+                    }
+                    val state = ScriptableObject.getProperty(scope, "__sb")
+                    if (state is Scriptable) ScriptableObject.putProperty(state, "segmentStatus", status)
+                    ScriptableObject.putProperty(argument, "segments", array)
+                }.onFailure { ModLog.w("分段结果注入失败", it) }
+            }
             callbacks.forEach { callback ->
                 runCatching { callback.call(cx, scope, scope, arrayOf<Any>(argument)) }
                     .onFailure { ModLog.w("会话结果回调执行失败", it) }
@@ -382,6 +488,24 @@ object SparkScriptEngine {
         }
         return Context.toString(result)
     }
+
+    /** 解析 JS 侧 `__sparkFinalize()` 给出的分段数组。 */
+    private fun parseSegments(json: String): List<SendSegment> =
+        runCatching {
+            val array = org.json.JSONArray(json)
+            (0 until array.length()).mapNotNull { index ->
+                val item = array.optJSONObject(index) ?: return@mapNotNull null
+                val kind = item.optString("kind")
+                if (kind.isEmpty()) return@mapNotNull null
+                SendSegment(
+                    kind = kind,
+                    text = item.optString("text"),
+                    name = item.optString("name"),
+                    id = item.optString("id"),
+                    handle = item.optString("handle"),
+                )
+            }
+        }.getOrDefault(emptyList())
 
     /** 脚本可见成员说明：只用于判定哪些变量进 `ctx.io`（见 [IO_KEYS]）。 */
     data class Doc(
@@ -519,6 +643,120 @@ object SparkScriptEngine {
           ctx.result = chosen;
           __sb.result0 = chosen;
         }
+
+        // ---- 分段发送：ctx.commit / submit / exit / segment，贴纸对象 push ----
+        var __sparkSegs = [], __sparkFront = [], __sparkLast = [], __sparkCommits = 0;
+        var __sparkExited = false;
+
+        // ctx.result.push 换成会认贴纸对象的版本：push({type:"sticker", name:"续火花"})
+        function __sparkInitResult(list){
+          list.push = function(x){
+            if (x && typeof x === "object" && x.type === "sticker"){ __sparkSticker(x); return this.length; }
+            return Array.prototype.push.call(this, x);
+          };
+        }
+
+        function __sparkTextOf(){
+          var arr = ctx.result;
+          if (typeof arr === "string") arr = [arr];
+          if (Object.prototype.toString.call(arr) !== "[object Array]") arr = [arr];
+          return arr ? arr.join("\n").trim() : "";
+        }
+
+        function __sparkClearResult(){
+          ctx.result = [];
+          __sparkInitResult(ctx.result);
+          __sb.result0 = ctx.result;
+        }
+
+        // 追加文本段；超过 maxCommits 就并进最后一段（避免一段一消息刷屏）
+        function __sparkAddText(text){
+          if (!text) return null;
+          var max = Number(__sb.maxCommits || 3);
+          if (__sparkCommits >= max && __sparkSegs.length){
+            var lastSeg = __sparkSegs[__sparkSegs.length - 1];
+            if (lastSeg.kind === "text"){ lastSeg.text += "\n" + text; return lastSeg; }
+          }
+          var seg = { kind: "text", text: text };
+          __sparkSegs.push(seg);
+          return seg;
+        }
+
+        function __sparkCommitText(){
+          var text = __sparkTextOf();
+          __sparkClearResult();
+          return __sparkAddText(text);
+        }
+
+        function __sparkSticker(st){
+          var item = { kind: "sticker", name: String(st.name || ""), id: st.id ? String(st.id) : "" };
+          var mode = __sb.stickerPushMode || "split";
+          if (mode === "appendLast"){ __sparkLast.push(item); return; }
+          if (mode === "prependFirst"){ __sparkFront.push(item); return; }
+          if (mode === "stickerOnly"){ __sparkSegs.push(item); return; }
+          __sparkCommitText();
+          __sparkSegs.push(item);
+        }
+
+        // ctx.commit()：把当前 ctx.result 收成一段，返回 {handle, index}
+        ctx.commit = function(){
+          var seg = __sparkCommitText();
+          __sparkCommits++;
+          // handle 与最终编号一致（__sparkFinalize 按位置重编 seg-1..N）；没有内容可收时给空串
+          return { handle: seg ? ("seg-" + __sparkSegs.length) : "", index: __sparkSegs.length };
+        };
+
+        // ctx.submit()：收尾并结束脚本（后面的代码不再执行）
+        ctx.submit = function(){
+          __sparkCommitText();
+          throw { __sparkStop: true, __sparkKind: "submit" };
+        };
+
+        // ctx.exit()：放弃这一轮，什么都不发
+        ctx.exit = function(){
+          __sparkExited = true;
+          __sparkSegs = []; __sparkFront = []; __sparkLast = [];
+          __sparkClearResult();
+          throw { __sparkStop: true, __sparkKind: "exit" };
+        };
+
+        // ctx.segment(handle)：查某段结果（发送后宿主回填，发送前一律 pending）
+        ctx.segment = function(handle){
+          var table = __sb.segmentStatus || {};
+          return table[handle] || { handle: handle, status: "pending" };
+        };
+
+        function __sparkFinalize(){
+          if (__sparkExited) return "[]";
+          __sparkCommitText();
+          var out = [].concat(__sparkFront, __sparkSegs, __sparkLast);
+          for (var i = 0; i < out.length; i++){ out[i].handle = "seg-" + (i + 1); }
+          __sparkFront = []; __sparkLast = [];
+          return JSON.stringify(out);
+        }
+
+        // 贴纸目录：ctx.sticker.list() / ctx.sticker.get(name) / 全局 sticker(name)
+        __sb.stickers = (__sb.stickersJson && __sb.stickersJson.length > 2) ? JSON.parse(__sb.stickersJson) : [];
+        function __stickerOf(name){
+          var list = __sb.stickers || [];
+          for (var i = 0; i < list.length; i++){
+            if (String(list[i].name) === String(name)) {
+              return { type: "sticker", name: list[i].name, static: list[i].static, animate: list[i].animate };
+            }
+          }
+          return null;
+        }
+        function sticker(name){ return __stickerOf(name); }
+        ctx.sticker = {
+          /** 全部互动贴纸：`[{name, static, animate}]`；可传函数自行筛选。 */
+          list: function(filter){
+            var list = (__sb.stickers || []).slice();
+            if (typeof filter === "function") return list.filter(function(it){ return filter(it); });
+            return list;
+          },
+          /** 按名字精确取一个贴纸对象，找不到返回 null。 */
+          get: function(name){ return __stickerOf(name); }
+        };
 
         // 系统接口：会话列表 + 宏挂载
         // target 可以是：不传（当前会话）/ { conversation: "id" } / { template: "id", inherit: true|false }

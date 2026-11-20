@@ -19,6 +19,7 @@ import com.worldmargin.autospark.app.script.EmptyResultException
 import com.worldmargin.autospark.app.script.SparkScriptEngine
 import com.worldmargin.autospark.host.im.ImBridge
 import com.worldmargin.autospark.app.config.StickerCatalog
+import com.worldmargin.autospark.host.im.StickerCatalog as HostStickerCatalog
 import com.worldmargin.autospark.host.im.ImMsgBridge
 import org.json.JSONArray
 import org.json.JSONObject
@@ -90,6 +91,7 @@ object AutoSparkBridge {
 
     /** 脚本可见的沙盒环境：归属、已有数据、会话列表。 */
     private fun sandboxEnv(
+        context: Context,
         config: SparkConfig,
         conversationId: String,
         conversations: org.json.JSONArray,
@@ -103,6 +105,8 @@ object AutoSparkBridge {
             templateInfo = templateInfoJson(config, conversationId),
             macroNames = macroNamesJson(config),
             info = infoJson(config, conversations, only, ignoreSentToday),
+            // 互动贴纸目录：从抖音自己的 keva 策略里读出当前下发的表情（没读到就是空数组，脚本退回 [STICKER:名] 标记）
+            stickers = HostStickerCatalog.json(context),
             preview = false,
         )
 
@@ -416,10 +420,11 @@ object AutoSparkBridge {
         pendingSandbox: MutableList<SandboxVar>,
         pendingSandboxDeletes: MutableList<Pair<String, String>>,
         macroOps: MutableList<SparkScriptEngine.MacroOp>,
+        segmentsJson: String = "",
     ) {
         if (callbacks.isEmpty()) return
         val extra =
-            runCatching { SparkScriptEngine.notifySendResult(callbacks, conversationId, result, reason) }
+            runCatching { SparkScriptEngine.notifySendResult(callbacks, conversationId, result, reason, segmentsJson) }
                 .getOrNull() ?: return
         pendingSandbox.addAll(extra.sandboxWrites)
         pendingSandboxDeletes.addAll(extra.sandboxDeletes.map { it.owner to it.key })
@@ -434,6 +439,23 @@ object AutoSparkBridge {
      * 非空结果由 App 侧 [SparkConfig.mergeSnapshots] 合并进已有快照
      * （IM 是分批吐会话的，一次扫描不能代表完整列表）。
      */
+    /**
+     * 表情名 → content JSON。
+     *
+     * 两级：先按抖音当前下发的目录（keva `strategy_config.sgv`）取**有效签名地址**，
+     * 套我们抓包的全量字段；目录里没有（或解析失败）再退回硬编码的「续火花」。
+     */
+    private fun stickerContentFor(context: Context, name: String): String? {
+        val trimmed = name.trim()
+        if (trimmed.isBlank()) return null
+        val item = HostStickerCatalog.items(context).firstOrNull { it.name == trimmed }
+        if (item != null) {
+            val dynamic = StickerCatalog.contentWithUrl(trimmed, item.staticUrl)
+            if (dynamic != null) return dynamic
+        }
+        return StickerCatalog.byName(trimmed)
+    }
+
     fun refreshSnapshot(context: Context): RefreshOutcome {
         val fetched = fetchConversations()
         val conversations = fetched.conversations ?: return RefreshOutcome(false, fetched.error)
@@ -1050,7 +1072,7 @@ object AutoSparkBridge {
                             config.templateVarsFor(conversationId),
                         ) + script,
                         buildVariables(conversation, spark),
-                        sandboxEnv(config, conversationId, conversations, only, ignoreSentToday),
+                        sandboxEnv(context, config, conversationId, conversations, only, ignoreSentToday),
                         templateNameOf(config, conversationId),
                         parentTemplateNameOf(config, conversationId),
                     )
@@ -1081,22 +1103,74 @@ object AutoSparkBridge {
                 rendered.macroOps.map { op -> if (op.targetId.isBlank()) op.copy(targetId = conversationId) else op }
             val text = rendered.text
 
-            val outcome =
-                runCatching {
-                    if (StickerCatalog.isStickerMark(text)) {
-                        val stickerName = StickerCatalog.nameOf(text)
-                        val stickerJson = StickerCatalog.byName(stickerName)
-                        if (stickerJson == null) {
-                            JSONObject().put("ok", false).put("error", "未知互动表情: $stickerName")
-                        } else {
-                            JSONObject(ImMsgBridge.sendStickerJson(conversationId, stickerJson))
-                        }
+            // 分段发送：脚本用 ctx.commit() 切段、push({type:"sticker"}) 插贴纸；
+            // 没分段时退化成「整条 text 发一次」，与老行为完全一致。
+            val segments =
+                rendered.segments.ifEmpty { listOf(SparkScriptEngine.SendSegment("text", text = text)) }
+            val segResults = JSONArray()
+            var sentAny = false
+            var allOk = true
+            var firstReason = ""
+            var lastMsgId = 0L
+            segments.forEach { seg ->
+                val ok: Boolean
+                val errorText: String
+                if (seg.kind == "text" && StickerCatalog.isStickerMark(seg.text)) {
+                    // 老写法兼容：整段就是 [STICKER:名] 标记时按贴纸发（v2.2.0 之前只有这一种贴纸用法）
+                    val stickerName = StickerCatalog.nameOf(seg.text)
+                    val content = stickerContentFor(context, stickerName)
+                    if (content == null) {
+                        ok = false
+                        errorText = "未知互动表情: $stickerName"
                     } else {
-                        JSONObject(ImMsgBridge.sendTextJson(conversationId, text, 0L, ""))
+                        val outcome =
+                            runCatching { JSONObject(ImMsgBridge.sendStickerJson(conversationId, content)) }.getOrNull()
+                        ok = outcome != null && outcome.optBoolean("ok")
+                        errorText = outcome?.optString("error").orEmpty().ifBlank { "贴纸发送失败" }
+                        if (ok) lastMsgId = outcome?.optLong("msgId") ?: lastMsgId
                     }
-                }.getOrNull()
-            val success = outcome != null && outcome.optBoolean("ok")
-            val reason = if (success) "" else (outcome?.optString("error")?.takeIf { it.isNotBlank() } ?: "发送失败")
+                    segResults.put(
+                        JSONObject().put("handle", seg.handle).put("kind", "sticker").put("ok", ok)
+                            .put("name", stickerName).put("reason", if (ok) "" else errorText),
+                    )
+                } else if (seg.kind == "text") {
+                    val outcome =
+                        runCatching { JSONObject(ImMsgBridge.sendTextJson(conversationId, seg.text, 0L, "")) }.getOrNull()
+                    ok = outcome != null && outcome.optBoolean("ok")
+                    errorText = outcome?.optString("error").orEmpty().ifBlank { "发送失败" }
+                    if (ok) lastMsgId = outcome?.optLong("msgId") ?: lastMsgId
+                    segResults.put(
+                        JSONObject().put("handle", seg.handle).put("kind", "text").put("ok", ok)
+                            .put("reason", if (ok) "" else errorText),
+                    )
+                } else {
+                    val content = stickerContentFor(context, seg.name)
+                    if (content == null) {
+                        ok = false
+                        errorText = "未知互动表情: ${seg.name}"
+                        segResults.put(
+                            JSONObject().put("handle", seg.handle).put("kind", "sticker").put("ok", false)
+                                .put("name", seg.name).put("reason", errorText),
+                        )
+                    } else {
+                        val outcome =
+                            runCatching { JSONObject(ImMsgBridge.sendStickerJson(conversationId, content)) }.getOrNull()
+                        ok = outcome != null && outcome.optBoolean("ok")
+                        errorText = outcome?.optString("error").orEmpty().ifBlank { "贴纸发送失败" }
+                        if (ok) lastMsgId = outcome?.optLong("msgId") ?: lastMsgId
+                        segResults.put(
+                            JSONObject().put("handle", seg.handle).put("kind", "sticker").put("ok", ok)
+                                .put("name", seg.name).put("reason", if (ok) "" else errorText),
+                        )
+                    }
+                }
+                if (ok) sentAny = true else {
+                    allOk = false
+                    if (firstReason.isEmpty()) firstReason = errorText
+                }
+            }
+            val success = allOk && sentAny
+            val reason = if (success) "" else firstReason.ifBlank { "发送失败" }
             fireResultCallbacks(
                 rendered.callbacks,
                 conversationId,
@@ -1105,17 +1179,20 @@ object AutoSparkBridge {
                 pendingSandbox,
                 pendingSandboxDeletes,
                 macroOps,
+                segmentsJson = segResults.toString(),
             )
             if (success) {
                 ConfigClient.markSent(context, conversationId, today)
                 sent.put(
                     JSONObject().put("conversationId", conversationId).put("name", name)
-                        .put("text", text).put("msgId", outcome.optLong("msgId")),
+                        .put("text", text).put("msgId", lastMsgId)
+                        .put("segments", segResults.length()),
                 )
             } else {
                 failed.put(
                     JSONObject().put("conversationId", conversationId).put("name", name)
-                        .put("error", outcome?.optString("error") ?: "发送失败"),
+                        .put("error", reason.ifBlank { "发送失败" })
+                        .put("segments", segResults),
                 )
             }
         }

@@ -4,8 +4,8 @@
 
 **一句话**：给「抖音判定今天还没互动」的会话，自动发一条你自己写的私信，每个会话每天最多一条。
 
-<!-- version-anchor: v2.1.3 (20007) -->
-**版本 v2.1.3**（versionCode 20007）· Android 9+ / Root / LSPosed 2.x · 仅 arm64-v8a
+<!-- version-anchor: v2.2.0 (20008) -->
+**版本 v2.2.0**（versionCode 20008）· Android 9+ / Root / LSPosed 2.x · 仅 arm64-v8a
 
 ---
 
@@ -43,15 +43,15 @@
 
 ### 互动表情
 
-模板里写 `ctx.result.push("[STICKER:续火花]")`，发出的是抖音的**互动表情**（火焰贴纸，`msgType=5`），不是文字。
+模板里写 `ctx.result.push({ type: "sticker", name: "续火花" })`，发出的是抖音的**互动表情**（火焰贴纸，`msgType=5`），不是文字。
 
 ```js
 var who = ctx.io.name || "朋友";
-ctx.result.push("[STICKER:续火花]");
 ctx.result.push(who + "，火花 " + ctx.io.days + " 天啦");
+ctx.result.push({ type: "sticker", name: "续火花" });
 ```
 
-`[STICKER:xxx]` 是本版私有标记，退回上游版本会被当普通文字发出去。
+v2.2.0 起表情目录从抖音自己的配置里读（当前 21 个），`ctx.sticker.list()` 可以看全部名字。老的 `[STICKER:续火花]` 写法仍然能用。
 
 ### 定时唤醒
 
@@ -345,19 +345,64 @@ ctx.result.push("今天也要加油");
 
 **空列表 = 这条不发**（回执 `Skipped`）。
 
-### 8.2 互动表情：`[STICKER:表情名]`
+### 8.2 分条发送：`ctx.commit()` / `ctx.submit()` / `ctx.exit()`
 
-本版新增。写这一行会发**抖音互动表情**（不是文字）：
+本版新增。默认一个会话只发**一条**消息；想拆成多条就调 `ctx.commit()`：
 
 ```js
+ctx.result.push("早，今天也续上");
+ctx.commit();              // 到这儿收成第 1 条
+ctx.result.push("火花别断");
+ctx.commit();              // 第 2 条
+// 脚本结束时剩下的内容自动收成最后一条
+```
+
+| 方法 | 作用 |
+|---|---|
+| `ctx.commit()` | 把当前 `ctx.result` 收成一段（一条消息），返回 `{handle:"seg-1", index:1}` |
+| `ctx.submit()` | 收尾并**立刻结束脚本**（后面的代码不再执行） |
+| `ctx.exit()` | 放弃这一轮，**什么都不发** |
+| `ctx.segment(handle)` | 查某一段的结果：`{handle, status:"sent"/"failed"}` |
+
+注意：
+
+- **一个会话最多 3 段**（含贴纸段）。超出后新内容会并进最后一条文本，避免刷屏。
+- 分条发送的消息之间没有延迟控制，抖音端按顺序收到。
+- 回调里的 `result` 参数多一个 `segments` 数组（`[{handle, kind, ok, name, reason}]`），可以逐段判断。
+
+### 8.3 互动表情
+
+本版新增。两种写法等价，推荐对象写法（表情目录随抖音版本自动更新）：
+
+```js
+// 推荐：对象写法
+ctx.result.push({ type: "sticker", name: "续火花" });
+
+// 兼容：老标记写法（v2.2.0 之前只有这一种）
 ctx.result.push("[STICKER:续火花]");
 ```
 
-目前支持：
+贴纸对象只有 `name` 一个字段必填。它**自己占一条消息**：push 之前攒的文本会先收成一段，贴纸紧跟着单独发出去。
 
-| 标记 | 发出的东西 |
-|---|---|
-| `[STICKER:续火花]` | 火焰贴纸（面板「互动表情」第一格） |
+```js
+ctx.result.push("给你个");
+ctx.result.push({ type: "sticker", name: "续火花" });
+ctx.result.push("记得回我");
+// 对方收到 3 条：给你个 / 火焰贴纸 / 记得回我
+```
+
+**表情目录**（本版新增，从抖音自己的配置里读，21 个表情）：
+
+```js
+ctx.sticker.list()                    // [{name, static, animate}, ...]
+ctx.sticker.list(function (it) {      // 传函数自行筛选
+  return it.name.length <= 3;
+});
+ctx.sticker.get("续火花")              // 精确取一个，找不到返回 null
+sticker("续火花")                      // 全局简写，等价于 ctx.sticker.get
+```
+
+目录为空（读不到抖音配置）时退回内置的「续火花」，此时 `ctx.sticker.list()` 只返回一项。
 
 实现路径：
 
@@ -372,9 +417,9 @@ Message$Builder.build()
 
 注意：互动表情**不走** `IMessageUtils.sendMessage` 的文本重载。抓 hook 时挂在 `Message$Builder.build()` 上才抓得到。
 
-表情资源 URL 带签名，有效期到 **2027-11**，过期需重新抓取。
+表情资源 URL 带签名，有效期到 **2027-11**。本版起优先用抖音当前下发的地址（签名更新），只有读不到配置时才用内置地址。
 
-### 8.3 变量
+### 8.4 变量
 
 | 对象 | 内容 |
 |---|---|
@@ -393,7 +438,7 @@ var who = ctx.io.name || "朋友";
 ctx.result.push(who + "，火花 " + ctx.io.days + " 天啦");
 ```
 
-### 8.4 `ctx.builtin`
+### 8.5 `ctx.builtin`
 
 | 函数 | 返回 |
 |---|---|
@@ -407,7 +452,7 @@ ctx.result.push(who + "，火花 " + ctx.io.days + " 天啦");
 | `nextNewYear()` / `untilNewYear()` | 下一个元旦日期 / 还有几天 |
 | `formatDate(date, "yyyy/MM/dd")` | 按模式格式化 |
 
-### 8.5 `ctx.system`
+### 8.6 `ctx.system`
 
 | 方法 | 说明 |
 |---|---|
@@ -450,7 +495,12 @@ var longSpark = ctx.system.getAllConversation({ days: function (d) { return d >=
 
 可用能力（全部挂在 ctx 上）：
 ctx.result.push("一行内容")        输出，空列表 = 这条不发；多行拼成一条消息
-ctx.result.push("[STICKER:续火花]") 发互动表情（火焰贴纸）
+ctx.commit()                       把当前内容收成一条，之后接着攒下一条（每会话最多 3 条）
+ctx.submit()                       收尾并立刻结束脚本
+ctx.exit()                         放弃这一轮，什么都不发
+ctx.result.push({type:"sticker", name:"续火花"})  发互动表情（火焰贴纸）
+ctx.sticker.list()                 当前可用的互动表情名字（21 个）
+ctx.sticker.get("续火花")           精确取一个贴纸对象
 ctx.io.name / nickname / remark    显示名 / 昵称 / 备注
 ctx.io.days                        连续聊天天数
 ctx.io.state                       1=今天已互动 2=今天没互动 3=待重燃 -1=无火花
@@ -565,10 +615,10 @@ ctx.result.push(ctx.builtin.pick([
                       └─ 对每个候选：
                            1. 取模板（会话自己的 > 继承的父模板）
                            2. 注入变量（模板层 + 会话层）
-                           3. 执行脚本 → ctx.result
+                           3. 执行脚本 → ctx.result（ctx.commit 切段）
                            4. 空列表 → Skipped
-                           5. 检测 [STICKER:xxx] → sendStickerJson（msgType=5）
-                              否则 → sendTextJson（msgType=7）
+                           5. 逐段发：贴纸段 → sendStickerJson（msgType=5）
+                              文本段 → sendTextJson（msgType=7）
                            6. 等发送回执 → Succeed / Failed
                            7. 成功则记 sentDays
 ```
