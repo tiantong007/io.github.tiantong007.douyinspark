@@ -4,7 +4,6 @@ import com.worldmargin.autospark.app.config.model.ConversationSnapshot
 import com.worldmargin.autospark.app.config.model.ConversationTemplate
 import com.worldmargin.autospark.app.config.model.MacroScript
 import com.worldmargin.autospark.app.config.model.SandboxVar
-import com.worldmargin.autospark.app.config.model.SparkTag
 import com.worldmargin.autospark.app.config.model.TemplateGroup
 import com.worldmargin.autospark.app.config.model.TemplateSource
 import com.worldmargin.autospark.app.config.model.TemplateVar
@@ -26,10 +25,6 @@ data class SparkConfig(
     val functions: List<UserFunction> = emptyList(),
     /** 沙盒变量：脚本 `ctx.sandbox.setvar` 写下的 JSON 数据，按创建者归属。 */
     val sandbox: List<SandboxVar> = emptyList(),
-    /** 会话标签（展示 / 筛选用，不参与发送决策）。 */
-    val tags: List<SparkTag> = emptyList(),
-    /** 会话 id → 标签 id 集合；一个会话可以有多个标签。 */
-    val conversationTags: Map<String, Set<String>> = emptyMap(),
     /**
      * 宿主（抖音进程）最近一次运行的简报：快照刷新是否成功、失败原因、续火花结果。
      * 本机 LSPosed 日志不可用，这是唯一能让管理界面看到宿主侧状态的通道。
@@ -67,16 +62,6 @@ data class SparkConfig(
     fun group(id: String?): TemplateGroup? = groups.firstOrNull { it.id == id }
 
     fun conversation(id: String): ConversationTemplate? = conversations.firstOrNull { it.conversationId == id }
-
-    fun tag(id: String): SparkTag? = tags.firstOrNull { it.id == id }
-
-    /** 某个会话身上的标签（按标签定义顺序）。 */
-    fun tagsOf(conversationId: String): List<SparkTag> =
-        conversationTags[conversationId].orEmpty().mapNotNull { id -> tag(id) }
-
-    /** 标签 id → 使用它的会话数。 */
-    fun tagUsage(): Map<String, Int> =
-        tags.associate { item -> item.id to conversationTags.count { ids -> item.id in ids.value } }
 
     /** 继承来源的展示名；[inheritFrom] 为 null 表示这个会话还没写文案。 */
     fun inheritLabel(inheritFrom: String?): String =
@@ -133,12 +118,11 @@ data class SparkConfig(
                 kept += old.copy(missCount = old.missCount + 1)
             }
         }
-        // 快照删除后，手动归属与标签里指向它的 id 一起清掉（否则「已选目标」会永远多一个幽灵）
+        // 快照删除后，手动归属里指向它的 id 一起清掉（否则「已选目标」会永远多一个幽灵）
         return copy(
             snapshots = merged + kept,
             forcedRenew = forcedRenew - expired,
             forcedSkip = forcedSkip - expired,
-            conversationTags = conversationTags - expired,
         )
     }
 
@@ -325,22 +309,6 @@ data class SparkConfig(
 
         /** 连续这么多次扫描没出现，会话就从列表里隐藏（数据保留到 [SNAPSHOT_GRACE_MS]）。 */
         const val HIDDEN_AFTER_MISSES = 3
-
-        /** 标签调色板（标签只存下标，换配色不影响老配置）。 */
-        val TAG_COLORS =
-            listOf(
-                0xFF3B82F6.toInt(), // 蓝
-                0xFF22C55E.toInt(), // 绿
-                0xFFF59E0B.toInt(), // 橙
-                0xFFEF4444.toInt(), // 红
-                0xFF8B5CF6.toInt(), // 紫
-                0xFF06B6D4.toInt(), // 青
-                0xFFEC4899.toInt(), // 粉
-                0xFF64748B.toInt(), // 灰
-            )
-
-        /** 标签色（下标越界时夹到合法范围）。 */
-        fun tagColor(index: Int): Int = TAG_COLORS[index.coerceIn(0, TAG_COLORS.lastIndex)]
 
         /** 内置模板作为继承来源时的 id 前缀（内置模板不在 groups 里，用前缀区分）。 */
         const val BUILTIN_PREFIX = "builtin:"

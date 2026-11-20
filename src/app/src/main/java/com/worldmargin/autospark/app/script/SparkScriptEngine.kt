@@ -544,36 +544,7 @@ object SparkScriptEngine {
         }
         // 会话筛选：参数可以是函数（逐项判断），也可以是对象
         //（每个键都要相等；值是数组表示「其中之一」；值是函数表示自定义判断）
-        // tags: { include, except } 是标签的两级条件：内层数组 = 交集（都要有），
-        // 外层数组 = 并集（任一组成立即可）；元素可以是标签 id 或名字
-        function __tagHit(item, tag){
-          var list = item.tags || [];
-          for (var i = 0; i < list.length; i++){
-            var t = list[i];
-            if (t && (String(t.id) === String(tag) || String(t.name) === String(tag))) return true;
-          }
-          return false;
-        }
-        function __tagGroups(value){
-          if (!value || !value.length) return [];
-          // 一维数组 = 单个交集组；二维数组 = 多个交集组取并集
-          return (typeof value[0] === "string") ? [value] : value;
-        }
-        function __matchTagGroups(item, groups){
-          var list = __tagGroups(groups);
-          if (!list.length) return true;
-          for (var i = 0; i < list.length; i++){
-            var group = list[i];
-            if (typeof group === "string") group = [group];
-            if (!group.length) return true;
-            var ok = true;
-            for (var j = 0; j < group.length; j++){
-              if (!__tagHit(item, group[j])){ ok = false; break; }
-            }
-            if (ok) return true;
-          }
-          return false;
-        }
+        // 标签功能已移除：item.tags 恒为空数组，filter.tags 一律忽略（老脚本不报错）
         function __matchConversation(item, filter){
           if (!filter) return true;
           for (var key in filter){
@@ -587,12 +558,6 @@ object SparkScriptEngine {
             } else if (actual !== want){
               return false;
             }
-          }
-          var tagCond = filter.tags;
-          if (tagCond && Object.prototype.toString.call(tagCond) === "[object Array]") tagCond = { include: tagCond };
-          if (tagCond){
-            if (tagCond.include && !__matchTagGroups(item, tagCond.include)) return false;
-            if (tagCond.except && __matchTagGroups(item, tagCond.except)) return false;
           }
           return true;
         }

@@ -383,24 +383,6 @@ class ConversationEditActivity : Activity() {
         )
     }
 
-    /** 会话标签的小药丸：点一下开 / 关（选了用强调色，没选用灰）。 */
-    private fun tagChipButton(
-        label: String,
-        active: Boolean,
-        onClick: () -> Unit,
-    ): View =
-        text(label, 11f, if (active) COLOR_ACCENT else COLOR_DIM, bold = active).apply {
-            background = rounded(if (active) 0x223B7CFF else 0x0A000000, 10)
-            setPadding(dp(8), dp(3), dp(8), dp(3))
-            layoutParams =
-                LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                ).apply { marginEnd = dp(4) }
-            isClickable = true
-            setOnClickListener { onClick() }
-        }
-
     /** 底部动作条：放在编辑区下面，键盘弹出时也够得着；横向可滚动，按钮再多也不会被挤掉。 */
     private fun actionBar(): View =
         actionRow {

@@ -10,7 +10,6 @@ import com.worldmargin.autospark.app.config.model.MacroScript
 import com.worldmargin.autospark.app.config.model.UserFunction
 import com.worldmargin.autospark.app.config.model.ConversationSnapshot
 import com.worldmargin.autospark.app.config.model.SandboxVar
-import com.worldmargin.autospark.app.config.model.SparkTag
 
 object ConfigCodec {
     private const val KEY_ENABLED = "enabled"
@@ -32,8 +31,6 @@ object ConfigCodec {
     private const val KEY_CHECK_AT_ALARM_ONLY = "checkAtAlarmOnly"
     private const val KEY_MACROS = "macros"
     private const val KEY_FUNCTIONS = "functions"
-    private const val KEY_TAGS = "tags"
-    private const val KEY_CONVERSATION_TAGS = "conversationTags"
         private const val KEY_SANDBOX = "sandbox"
 
     private const val INHERIT_BLANK = "blank"
@@ -146,22 +143,6 @@ object ConfigCodec {
             )
         }
 
-        val tags = JSONArray()
-        config.tags.forEach { item ->
-            tags.put(
-                JSONObject()
-                    .put("id", item.id)
-                    .put("name", item.name)
-                    .put("color", item.color)
-                    .put("createdAt", item.createdAt),
-            )
-        }
-
-        val conversationTags = JSONObject()
-        config.conversationTags.forEach { (conversationId, ids) ->
-            conversationTags.put(conversationId, JSONArray(ids.toList()))
-        }
-
         return JSONObject()
             .put(KEY_ENABLED, config.enabled)
             .put(KEY_GROUPS, groups)
@@ -173,8 +154,6 @@ object ConfigCodec {
             .put(KEY_MACROS, macros)
             .put(KEY_FUNCTIONS, functions)
             .put(KEY_SANDBOX, sandbox)
-            .put(KEY_TAGS, tags)
-            .put(KEY_CONVERSATION_TAGS, conversationTags)
             .put(KEY_HOST_NOTE, config.hostNote)
             .put(KEY_HOST_NOTE_AT, config.hostNoteAt)
             .put(KEY_HOST_ALIVE_AT, config.hostAliveAt)
@@ -311,35 +290,6 @@ object ConfigCodec {
             }
         }
 
-        val tags = mutableListOf<SparkTag>()
-        root.optJSONArray(KEY_TAGS)?.let { array ->
-            for (index in 0 until array.length()) {
-                val item = array.optJSONObject(index) ?: continue
-                val name = item.optString("name").trim()
-                if (name.isEmpty()) continue
-                tags +=
-                    SparkTag(
-                        id = item.optString("id").ifBlank { java.util.UUID.randomUUID().toString() },
-                        name = name,
-                        color = item.optInt("color"),
-                        createdAt = item.optLong("createdAt"),
-                    )
-            }
-        }
-
-        val conversationTags = mutableMapOf<String, Set<String>>()
-        root.optJSONObject(KEY_CONVERSATION_TAGS)?.let { obj ->
-            obj.keys().forEach { conversationId ->
-                val ids =
-                    obj.optJSONArray(conversationId)?.let { array ->
-                        (0 until array.length())
-                            .mapNotNull { index -> array.optString(index).takeIf { it.isNotEmpty() } }
-                            .toSet()
-                    }.orEmpty()
-                if (ids.isNotEmpty()) conversationTags[conversationId] = ids
-            }
-        }
-
         return SparkConfig(
             enabled = root.optBoolean(KEY_ENABLED),
             groups = groups,
@@ -351,8 +301,6 @@ object ConfigCodec {
             macros = macros,
             functions = functions,
             sandbox = sandbox,
-            tags = tags,
-            conversationTags = conversationTags,
             hostNote = root.optString(KEY_HOST_NOTE),
             hostNoteAt = root.optLong(KEY_HOST_NOTE_AT),
             hostAliveAt = root.optLong(KEY_HOST_ALIVE_AT),

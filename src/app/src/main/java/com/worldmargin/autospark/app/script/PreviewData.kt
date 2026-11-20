@@ -43,10 +43,6 @@ object PreviewData {
                     isGroup -> forced
                     else -> forced || selected
                 }
-            val tags = JSONArray()
-            config.tagsOf(conversationId).forEach { tag ->
-                tags.put(JSONObject().put("id", tag.id).put("name", tag.name))
-            }
             conversations.put(
                 JSONObject()
                     .put("id", conversationId)
@@ -54,7 +50,8 @@ object PreviewData {
                     .put("name", snapshot?.displayName.orEmpty())
                     .put("remark", snapshot?.remark.orEmpty())
                     .put("peerUid", snapshot?.peerUid.orEmpty())
-                    .put("tags", tags)
+                    // 标签功能已移除；这个键保留成空数组，老脚本读 item.tags 不会拿到 undefined
+                    .put("tags", JSONArray())
                     .put("days", snapshot?.days ?: 0)
                     .put("state", snapshot?.state ?: -1)
                     .put("stateText", snapshot?.stateText.orEmpty())

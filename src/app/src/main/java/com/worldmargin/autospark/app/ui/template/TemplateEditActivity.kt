@@ -341,7 +341,7 @@ class TemplateEditActivity : Activity() {
         finish()
     }
 
-    /** 选择哪些会话继承本模板：打开独立的选择页（可搜标签、可多选）。 */
+    /** 选择哪些会话继承本模板：打开独立的选择页（可搜索、可多选）。 */
     private fun pickMembers() {
         val id = groupId ?: return
         val config = ConfigStore.load(this)

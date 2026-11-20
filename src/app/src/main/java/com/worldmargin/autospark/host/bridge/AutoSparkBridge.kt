@@ -177,7 +177,8 @@ object AutoSparkBridge {
                     .put("name", displayName(item))
                     .put("remark", item.optString("remarkName"))
                     .put("peerUid", item.optString("peerUid"))
-                    .put("tags", tagsJson(config, id))
+                    // 标签功能已移除；保留空数组键，老脚本读 item.tags 不会拿到 undefined
+                    .put("tags", JSONArray())
                     .put("days", spark?.optInt("days") ?: 0)
                     .put("state", spark?.optInt("state", -1) ?: -1)
                     .put("stateText", spark?.optString("stateText") ?: "")
@@ -245,7 +246,8 @@ object AutoSparkBridge {
                     .put("name", displayName(item))
                     .put("remark", item.optString("remarkName"))
                     .put("peerUid", item.optString("peerUid"))
-                    .put("tags", tagsJson(config, id))
+                    // 标签功能已移除；保留空数组键，老脚本读 item.tags 不会拿到 undefined
+                    .put("tags", JSONArray())
                     .put("days", spark?.optInt("days") ?: 0)
                     .put("state", spark?.optInt("state", -1) ?: -1)
                     .put("stateText", spark?.optString("stateText") ?: "")
@@ -1268,18 +1270,6 @@ object AutoSparkBridge {
     private fun displayName(conversation: JSONObject): String {
         val remark = conversation.optString("remarkName")
         return remark.ifBlank { conversation.optString("name") }
-    }
-
-    /** 会话身上的标签：`[{id, name}]`（脚本按标签筛选 / 取列表用）。 */
-    private fun tagsJson(
-        config: SparkConfig,
-        conversationId: String,
-    ): JSONArray {
-        val array = JSONArray()
-        config.tagsOf(conversationId).forEach { tag ->
-            array.put(JSONObject().put("id", tag.id).put("name", tag.name))
-        }
-        return array
     }
 
     private fun weekday(date: Date): String {

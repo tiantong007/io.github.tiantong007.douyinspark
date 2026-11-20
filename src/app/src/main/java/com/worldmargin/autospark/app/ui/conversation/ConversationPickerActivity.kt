@@ -37,8 +37,8 @@ import com.worldmargin.autospark.app.ui.common.UiKit.titleBar
 /**
  * 会话选择页（单独一页，替代原来的多选弹窗）。
  *
- * - 搜索框按 昵称 / 备注 / **标签名** 过滤；
- * - 顶部标签条可以按标签筛选（再点一次取消）；
+ * - 搜索框按 昵称 / 备注 过滤；
+ * - 顶部标记条可以按 已燃状态 / 继承来源 筛选；
  * - 会话可多选，标题栏「确定」把选中 id 回传给调用方。
  *
  * 入参见 companion；出参 [EXTRA_RESULT]（ArrayList&lt;String&gt;）。
@@ -53,12 +53,10 @@ class ConversationPickerActivity : Activity() {
     }
 
     private lateinit var listHost: LinearLayout
-    private lateinit var tagsHost: LinearLayout
     private lateinit var sourcesHost: LinearLayout
     private lateinit var confirmLabel: TextView
     private val selected = linkedSetOf<String>()
     private var query = ""
-    private val tagFilters = linkedSetOf<String>()
     private var sourceFilter: String? = null
     private var onlySingle = true
     /** 0 全部 / 1 已选中 / 2 未选中 */
@@ -74,7 +72,6 @@ class ConversationPickerActivity : Activity() {
 
         listHost = column()
         selectedHost = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        tagsHost = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         sourcesHost = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         confirmLabel = text(confirmText(), 14f, COLOR_ACCENT, bold = true).apply {
             isClickable = true
@@ -103,14 +100,6 @@ class ConversationPickerActivity : Activity() {
                                 addView(selectedHost)
                             },
                         )
-                        if (ConfigStore.load(this@ConversationPickerActivity).tags.isNotEmpty()) {
-                            addView(
-                                HorizontalScrollView(this@ConversationPickerActivity).apply {
-                                    isHorizontalScrollBarEnabled = false
-                                    addView(tagsHost)
-                                },
-                            )
-                        }
                         addView(
                             HorizontalScrollView(this@ConversationPickerActivity).apply {
                                 isHorizontalScrollBarEnabled = false
@@ -161,14 +150,12 @@ class ConversationPickerActivity : Activity() {
 
     private fun confirmText(): String = "确定 ${selected.size}"
 
-    /** 当前搜索 / 标签 / 来源条件下可见的会话（已隐藏的永远不出现）。 */
+    /** 当前搜索 / 来源条件下可见的会话（已隐藏的永远不出现）。 */
     /** 续火花页「未燃」里的 id：自动判定需要续的 + 手动移入的。 */
     private fun outerTargets(config: SparkConfig): Set<String> = config.selectedIds() + config.forcedRenew
 
     private fun visible(): List<ConversationSnapshot> {
         val config = ConfigStore.load(this)
-        // 标签可能在别的页面被删了：筛选项跟着失效，避免列表被筛成空
-        tagFilters.removeAll { id -> config.tag(id) == null }
         val needle = query.trim()
         val rows =
             config.snapshots
@@ -187,9 +174,6 @@ class ConversationPickerActivity : Activity() {
                     }
                 }
                 .filter { snapshot ->
-                    val tags = config.tagsOf(snapshot.conversationId)
-                    // 多选标签取并集：命中任意一个即可
-                    if (tagFilters.isNotEmpty() && tags.none { it.id in tagFilters }) return@filter false
                     if (sourceFilter != null && (config.inheritKey(snapshot.conversationId) ?: SRC_NONE) != sourceFilter) {
                         return@filter false
                     }
@@ -200,12 +184,7 @@ class ConversationPickerActivity : Activity() {
                         }
                     haystack.contains(needle, ignoreCase = true)
                 }
-        // 按标签筛选时：命中的所选标签越多越靠前，同分保持原顺序
-        return if (tagFilters.isEmpty()) {
-            rows
-        } else {
-            rows.sortedByDescending { snapshot -> config.tagsOf(snapshot.conversationId).count { it.id in tagFilters } }
-        }
+        return rows
     }
 
     private fun refreshList() {
@@ -213,16 +192,15 @@ class ConversationPickerActivity : Activity() {
         confirmLabel.text = confirmText()
         val rows = visible()
         if (rows.isEmpty()) {
-            listHost.addView(text("没有符合条件的会话（试试换个关键字或标签）", 13f, COLOR_DIM))
+            listHost.addView(text("没有符合条件的会话（试试换个关键字）", 13f, COLOR_DIM))
             return
         }
         val config = ConfigStore.load(this)
-        // 已选优先 → 命中的标签越多越靠前 → 火花天数多的靠前 → 名称兜底
+        // 已选优先 → 火花天数多的靠前 → 名称兜底
         val targets = outerTargets(config)
         val sorted =
             rows.sortedWith(
                 compareByDescending<ConversationSnapshot> { it.conversationId in targets }
-                    .thenByDescending { snapshot -> config.tagsOf(snapshot.conversationId).count { it.id in tagFilters } }
                     .thenByDescending { it.days }
                     .thenBy { it.displayName },
             )
@@ -315,14 +293,6 @@ class ConversationPickerActivity : Activity() {
                 column().apply {
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                     addView(text(snapshot.displayName.ifBlank { "(无名)" }, 15f, COLOR_TEXT, bold = true))
-                    val tags = config.tagsOf(id)
-                    if (tags.isNotEmpty()) {
-                        addView(
-                            row().apply {
-                                tags.forEach { tag -> addView(tagChip(tag.name, tag.color)) }
-                            },
-                        )
-                    }
                     addView(text(stateLine(snapshot), 12f, COLOR_DIM))
                 },
             )
@@ -342,21 +312,7 @@ class ConversationPickerActivity : Activity() {
             if (snapshot.stateText.isNotBlank()) append(" · ").append(snapshot.stateText)
         }
 
-    private fun tagChip(
-        name: String,
-        color: Int,
-    ): View =
-        text(name, 11f, SparkConfig.tagColor(color)).apply {
-            background = rounded(0x1A000000, 8)
-            setPadding(dp(6), dp(2), dp(6), dp(2))
-            layoutParams =
-                LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                ).apply { marginEnd = dp(4) }
-        }
-
-    /** 两行标记筛选：标签（彩色）+ 继承来源（灰）。 */
+    /** 两行标记筛选：已燃状态（彩色）+ 继承来源（灰）。 */
     private fun refreshChips() {
         val config = ConfigStore.load(this)
         selectedHost.removeAllViews()
@@ -366,25 +322,6 @@ class ConversationPickerActivity : Activity() {
                 refreshChips()
                 refreshList()
             })
-        }
-        tagsHost.removeAllViews()
-        if (config.tags.isNotEmpty()) {
-            tagsHost.addView(chip("全部", tagFilters.isEmpty()) {
-                tagFilters.clear()
-                refreshChips()
-                refreshList()
-            })
-            config.tags.forEach { tag ->
-                val active = tag.id in tagFilters
-                tagsHost.addView(
-                    chip(tag.name, active, if (active) null else SparkConfig.tagColor(tag.color)) {
-                        // 可多选：再点一次取消这一个，其余保留
-                        if (active) tagFilters.remove(tag.id) else tagFilters.add(tag.id)
-                        refreshChips()
-                        refreshList()
-                    },
-                )
-            }
         }
         sourcesHost.removeAllViews()
         val sources =
