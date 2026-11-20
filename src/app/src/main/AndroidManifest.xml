@@ -98,5 +98,12 @@
             android:exported="false"
             android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar"
             android:windowSoftInputMode="adjustResize" />
+
+        <!-- 分段预览：把一段脚本按「会发出几条」画成气泡（不发送） -->
+        <activity
+            android:name=".app.ui.settings.PreviewActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar"
+            android:windowSoftInputMode="adjustResize" />
     </application>
 </manifest>

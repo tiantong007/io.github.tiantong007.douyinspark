@@ -14,6 +14,7 @@ import com.worldmargin.autospark.app.config.model.ConversationSnapshot
 import com.worldmargin.autospark.app.config.SparkConfig
 import com.worldmargin.autospark.app.config.ConfigClient
 import com.worldmargin.autospark.host.im.AvatarCache
+import com.worldmargin.autospark.host.im.StickerImageCache
 import com.worldmargin.autospark.app.provider.ConfigContract
 import com.worldmargin.autospark.app.script.EmptyResultException
 import com.worldmargin.autospark.app.script.SparkScriptEngine
@@ -497,6 +498,10 @@ object AutoSparkBridge {
                     .filter { it.first.isNotBlank() && it.second.isNotBlank() },
             )
         }.onFailure { ModLog.w("头像同步失败", it) }
+        // 顺带把互动表情图也推过去（同样由宿主下载），预览页才能显示真实表情图。
+        runCatching {
+            StickerImageCache.sync(context, HostStickerCatalog.items(context).map { it.name to it.staticUrl })
+        }.onFailure { ModLog.w("表情图同步失败", it) }
         // 快照落盘后按保留策略清理：不在已选目标里的会话，模板与发送记录按 30 天宽限期清掉
         ConfigClient.prune(context, now)
         return RefreshOutcome(true, "${snapshots.size} 个会话")

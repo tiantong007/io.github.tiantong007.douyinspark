@@ -93,6 +93,15 @@ object ConfigContract {
     const val KEY_WRITTEN = "written"
 
     /**
+     * 写入一批互动表情图片：Bundle(key = "sticker:" + 名字 的 MD5, value = 图片字节)。
+     *
+     * 和头像同样的道理：模块没有 `INTERNET`，表情图由宿主（抖音进程）按 keva 里下发的
+     * `static_url` 下载后推过来，落盘到 `cacheDir/stickers/<key>.png`，
+     * 供预览页显示真实表情图（没有就用内置的火焰图标兜底）。
+     */
+    const val METHOD_PUT_STICKERS = "putStickers"
+
+    /**
      * 抖音进程 → 本模块进程：唤醒。
      *
      * 宿主调本模块的 ContentProvider 之前先发这个广播，让模块进程（连同它的 provider）先建起来。
@@ -184,7 +193,17 @@ class ConfigProvider : ContentProvider() {
             ConfigContract.METHOD_PUT_AVATARS -> {
                 val images = extras?.getBundle(ConfigContract.KEY_IMAGES)
                 val urls = extras?.getBundle(ConfigContract.KEY_URLS) ?: Bundle()
-                val written = if (images == null) -1 else writeAvatars(context, images, urls)
+                val written = if (images == null) -1 else writeImages(context, "avatars", images, urls)
+                Bundle().apply {
+                    putBoolean(ConfigContract.KEY_OK, written >= 0)
+                    putInt(ConfigContract.KEY_WRITTEN, written.coerceAtLeast(0))
+                }
+            }
+
+            ConfigContract.METHOD_PUT_STICKERS -> {
+                val images = extras?.getBundle(ConfigContract.KEY_IMAGES)
+                val urls = extras?.getBundle(ConfigContract.KEY_URLS) ?: Bundle()
+                val written = if (images == null) -1 else writeImages(context, "stickers", images, urls)
                 Bundle().apply {
                     putBoolean(ConfigContract.KEY_OK, written >= 0)
                     putInt(ConfigContract.KEY_WRITTEN, written.coerceAtLeast(0))
@@ -196,7 +215,7 @@ class ConfigProvider : ContentProvider() {
     }
 
     /**
-     * 把一批头像字节落盘到 `cacheDir/avatars/<key>.png`，旁边记一份 `<key>.url` 记来源地址。
+     * 把一批图片字节落盘到 `cacheDir/<subdir>/<key>.png`，旁边记一份 `<key>.url` 记来源地址。
      *
      * key 只接受 32 位小写十六进制（AvatarLoader.fileName 产出的形状），单张上限 512 KB：
      * 宿主是被 hook 的进程，这一层不能无条件信任它的输入。
@@ -206,14 +225,15 @@ class ConfigProvider : ContentProvider() {
      *
      * @return 实际写入张数；-1 表示有非法条目（其余合法条目照常写入）
      */
-    private fun writeAvatars(
+    private fun writeImages(
         context: Context,
+        subdir: String,
         images: Bundle,
         urls: Bundle,
     ): Int {
         var ok = true
         var written = 0
-        val dir = File(context.cacheDir, "avatars")
+        val dir = File(context.cacheDir, subdir)
         images.keySet().forEach { key ->
             val bytes = images.getByteArray(key)
             if (!HEX32.matches(key) || bytes == null || bytes.isEmpty() || bytes.size > 512 * 1024) {

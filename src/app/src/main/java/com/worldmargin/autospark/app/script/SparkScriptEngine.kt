@@ -214,6 +214,17 @@ object SparkScriptEngine {
     ): String = previewText(renderFull(script, values, env.copy(preview = true), "", ""))
 
     /**
+     * 预览用：把脚本跑一遍并**按段**返回（[Rendered.segments]），页面据此画出「会发出几条」。
+     *
+     * 与 [render] 一样是预览模式（不写变量、不挂宏），只是不把段压平成一行文本。
+     */
+    fun renderSegments(
+        script: String,
+        values: Map<String, Any?>,
+        env: SandboxEnv,
+    ): Rendered = renderFull(script, values, env.copy(preview = true), "", "")
+
+    /**
      * 预览文案：文本段原样，贴纸段标成 `[互动表情：名字]`。
      *
      * 预览只是给人看「会发出什么」，不能真的发贴纸，标注一下比悄悄吞掉更好懂。

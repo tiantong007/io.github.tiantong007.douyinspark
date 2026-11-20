@@ -103,6 +103,32 @@ object ConfigClient {
             }
         }.getOrDefault(-1)
 
+    /**
+     * 推送一批互动表情图片给模块进程落盘（key = 名字的 MD5，value = 图片字节）。
+     *
+     * 与 [putAvatars] 同一套协议：宿主下载、模块只存；模块侧落在 `cacheDir/stickers/`。
+     *
+     * @return 实际写入张数；通道不可用时返回 -1
+     */
+    fun putStickers(
+        context: Context,
+        images: Bundle,
+        urls: Bundle,
+    ): Int =
+        runCatching {
+            val extras =
+                Bundle().apply {
+                    putBundle(ConfigContract.KEY_IMAGES, images)
+                    putBundle(ConfigContract.KEY_URLS, urls)
+                }
+            val result = context.contentResolver.call(ConfigContract.URI, ConfigContract.METHOD_PUT_STICKERS, null, extras)
+            if (result?.getBoolean(ConfigContract.KEY_OK) == true) {
+                result.getInt(ConfigContract.KEY_WRITTEN)
+            } else {
+                -1
+            }
+        }.getOrDefault(-1)
+
     fun putSnapshots(
         context: Context,
         snapshots: List<ConversationSnapshot>,

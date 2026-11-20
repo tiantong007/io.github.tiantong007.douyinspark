@@ -2056,6 +2056,18 @@ class SparkSettingsActivity : Activity() {
                                                 row().apply {
                                                     setPadding(0, dp(6), 0, 0)
                                                     addView(cloneButton)
+                                                    addView(
+                                                        iconButton(UiKit.Icons.PREVIEW, "按条预览", compact = true) {
+                                                            guideTemplateBreathing = false
+                                                            stopGuideBreathing()
+                                                            PreviewActivity.open(
+                                                                context = this@SparkSettingsActivity,
+                                                                title = "预览（${builtin.name}）",
+                                                                program = config.composeProgram(builtin.body),
+                                                                sampleIndex = index,
+                                                            )
+                                                        },
+                                                    )
                                                 },
                                             )
                                         },
@@ -2131,6 +2143,11 @@ class SparkSettingsActivity : Activity() {
                                         row().apply {
                                             setPadding(0, dp(8), 0, dp(4))
                                             addView(iconButton(UiKit.Icons.EDIT, "编辑模板", primary = true, compact = true) { openTemplateEditor(group.id) })
+                                            addView(iconButton(UiKit.Icons.PREVIEW, "按条预览", compact = true) { openSegmentsPreview(config, group, index) })
+                                        },
+                                    )
+                                    addView(
+                                        row().apply {
                                             addView(iconButton(UiKit.Icons.PERSON_ADD, "选会话继承", compact = true) { pickMembers(group.id, group.name) })
                                             addView(iconButton(UiKit.Icons.CLONE, "克隆到会话", compact = true) { cloneBodyToConversations(group.name, group.body) })
                                         },
@@ -3425,6 +3442,21 @@ class SparkSettingsActivity : Activity() {
         vars: List<com.worldmargin.autospark.app.config.model.TemplateVar> = emptyList(),
     ): String =
         preview(config, config.composeProgram(group.body, config.macrosForTemplate(group.id)), sampleIndex, vars)
+
+    /** 按条预览：一页气泡，能看出会发几条、哪条是互动表情。 */
+    private fun openSegmentsPreview(
+        config: SparkConfig,
+        group: TemplateGroup,
+        sampleIndex: Int,
+    ) {
+        PreviewActivity.open(
+            context = this,
+            title = "预览（${group.name.ifBlank { "未命名" }}）",
+            program = config.composeProgram(group.body, config.macrosForTemplate(group.id)),
+            conversationId = group.id,
+            sampleIndex = sampleIndex,
+        )
+    }
 
     private fun preview(
         config: SparkConfig,

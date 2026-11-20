@@ -30,6 +30,7 @@ import com.worldmargin.autospark.app.ui.common.UiKit.icon
 import com.worldmargin.autospark.app.ui.common.UiKit.iconButton
 import com.worldmargin.autospark.app.ui.common.UiKit.padSystemBars
 import com.worldmargin.autospark.app.ui.common.UiKit.pasteButton
+import com.worldmargin.autospark.app.ui.common.stickerButton
 import com.worldmargin.autospark.app.ui.common.UiKit.rounded
 import com.worldmargin.autospark.app.ui.common.UiKit.row
 import com.worldmargin.autospark.app.ui.common.UiKit.text
@@ -37,6 +38,7 @@ import com.worldmargin.autospark.app.ui.common.UiKit.titleBar
 import java.util.UUID
 import com.worldmargin.autospark.app.editor.SparkEditor
 import com.worldmargin.autospark.app.editor.SparkEditors
+import com.worldmargin.autospark.app.ui.settings.PreviewActivity
 import com.worldmargin.autospark.app.ui.settings.SparkPreview
 import com.worldmargin.autospark.app.ui.variable.VariableListActivity
 import com.worldmargin.autospark.app.ui.common.UiKit
@@ -103,6 +105,7 @@ class TemplateEditActivity : Activity() {
                 addView(iconButton(UiKit.Icons.PREVIEW, "", primary = true, compact = true, hint = "预览") { showPreview() })
 
                 addView(pasteButton(editor))
+                addView(stickerButton(editor))
                 addView(iconButton(UiKit.Icons.WAND, "", compact = true, hint = "格式化") { editor.format() })
                 if (existed) {
                     addView(iconButton(UiKit.Icons.PERSON_ADD, "", compact = true, hint = "继承会话") { pickMembers() })
@@ -202,20 +205,13 @@ class TemplateEditActivity : Activity() {
         val sample = SparkPreview.sample(config)
         // 变量用**当前正在编辑的**（还没保存也算），这样改完表达式直接能预览
         val vars = collectVariables()
-        val rendered =
-            runCatching {
-                SparkScriptEngine.render(
-                    TemplateVarPrelude.of(vars) + program,
-                    SparkPreview.variables(sample),
-                    PreviewData.env(config, groupId),
-                )
-            }.getOrElse { "【预览失败】" + (it.message ?: it.toString()) }
-        AlertDialog
-            .Builder(this)
-            .setTitle("预览（样例：${sample?.displayName ?: "无缓存，用占位值"}）")
-            .setMessage(rendered)
-            .setPositiveButton("好", null)
-            .show()
+        // 多段发送之后「预览」得按条看：一页气泡，能看出会发几条、哪条是贴纸
+        PreviewActivity.open(
+            context = this,
+            title = "预览（样例：${sample?.displayName ?: "无缓存，用占位值"}）",
+            program = TemplateVarPrelude.of(vars) + program,
+            conversationId = groupId,
+        )
     }
 
     /** 标题栏右侧的保存动作。 */
