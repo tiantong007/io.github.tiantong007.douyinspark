@@ -14,50 +14,54 @@ import android.view.View
 import android.view.ViewOutlineProvider
 import android.widget.ImageView
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 import java.security.MessageDigest
 import java.util.concurrent.Executors
 
 /**
- * 头像加载器：内存缓存 → 磁盘缓存 → 网络下载（成功即落盘）。
+ * 头像加载器：内存缓存 → 磁盘缓存 → 名字首字占位图。
  *
- * 请求不到时用「名字首字 + 色块」的占位图，界面上不会出现空洞。
+ * 模块**不申请 `INTERNET`**，这里不做任何网络请求：图片由宿主（抖音进程）从抖音自己的
+ * 头像缓存里读出来后推过来（见 `host/im/AvatarCache.kt`），本类只读
+ * `cacheDir/avatars/<md5>.png`。没有文件就显示色块首字，界面上不会出现空洞。
  */
 object AvatarLoader {
     private val memory = LruCache<String, Bitmap>(96)
     private val pool = Executors.newFixedThreadPool(3)
     private val main = Handler(Looper.getMainLooper())
 
-    private const val TIMEOUT_MS = 8_000
     private const val MAX_EDGE = 256
 
-    /** 把 [url] 的头像装进 [view]；失败/为空时显示 [name] 首字占位图。头像按圆形显示。 */
+    /**
+     * 把 [key] 对应的头像装进 [view]；没有缓存时显示 [name] 首字占位图。头像按圆形显示。
+     *
+     * [key] 用稳定的用户 id（`peerUid`），**不用 URL** —— URL 会随换头像 / CDN 参数变化，
+     * 按 id 存才能始终命中「这个用户当前」的头像；宿主写盘时用的是同一个 key。
+     */
     fun load(
         context: Context,
         view: ImageView,
-        url: String,
+        key: String,
         name: String,
         sizeDp: Int = 42,
     ) {
         clipToCircle(view)
         val size = (sizeDp * context.resources.displayMetrics.density).toInt()
-        view.tag = url
+        view.tag = key
         val placeholder = placeholder(name, size)
-        memory.get(memoryKey(url, name, size))?.let {
+        memory.get(memoryKey(key, size))?.let {
             view.setImageBitmap(it)
             return
         }
         view.setImageBitmap(placeholder)
-        if (url.isBlank()) return
+        if (key.isBlank()) return
 
         pool.execute {
-            val cache = File(avatarDir(context), fileName(url))
-            val bitmap = if (cache.isFile) decode(cache) else download(url)?.also { save(cache, it) }
+            val cache = File(avatarDir(context), fileName(key))
+            val bitmap = if (cache.isFile) decode(cache) else null
             if (bitmap == null) return@execute
-            memory.put(memoryKey(url, name, size), bitmap)
+            memory.put(memoryKey(key, size), bitmap)
             main.post {
-                if (view.tag == url) view.setImageBitmap(bitmap)
+                if (view.tag == key) view.setImageBitmap(bitmap)
             }
         }
     }
@@ -122,37 +126,16 @@ object AvatarLoader {
             BitmapFactory.decodeFile(file.absolutePath, options)
         }.getOrNull()
 
-    private fun download(url: String): Bitmap? =
-        runCatching {
-            val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-                connectTimeout = TIMEOUT_MS
-                readTimeout = TIMEOUT_MS
-                instanceFollowRedirects = true
-                setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14)")
-            }
-            connection.inputStream.use { BitmapFactory.decodeStream(it) }
-        }.getOrNull()
-
-    private fun save(
-        file: File,
-        bitmap: Bitmap,
-    ) {
-        runCatching {
-            file.parentFile?.mkdirs()
-            file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        }
-    }
-
     private fun avatarDir(context: Context): File = File(context.cacheDir, "avatars")
 
-    private fun fileName(url: String): String {
-        val digest = MessageDigest.getInstance("MD5").digest(url.toByteArray(Charsets.UTF_8))
+    /** 缓存文件名：与宿主 `AvatarCache.keyOf` 一致 —— uid 的 UTF-8 MD5 十六进制 + `.png`。 */
+    private fun fileName(key: String): String {
+        val digest = MessageDigest.getInstance("MD5").digest(key.toByteArray(Charsets.UTF_8))
         return digest.joinToString("") { "%02x".format(it) } + ".png"
     }
 
     private fun memoryKey(
-        url: String,
-        name: String,
+        key: String,
         size: Int,
-    ): String = if (url.isBlank()) "name:$name:$size" else "$url:$size"
+    ): String = "$key:$size"
 }

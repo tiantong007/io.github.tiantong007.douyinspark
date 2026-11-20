@@ -1,3 +1,4 @@
+import java.security.MessageDigest
 import java.util.Properties
 
 plugins {
@@ -5,14 +6,51 @@ plugins {
 }
 
 // ===== 版本号唯一真源：发版只改这两行 =====
-val appVersionCode = 20006
-val appVersionName = "v2.1.2"
+val appVersionCode = 20007
+val appVersionName = "v2.1.3"
 
 // 签名信息读取自根目录 release-signing.properties（不入库），缺失时不签名
 val releaseSigning =
     rootProject.file("release-signing.properties").takeIf { it.exists() }?.let { props ->
         Properties().apply { props.inputStream().use { load(it) } }
     }
+
+/**
+ * 内容指纹：把「会原样进 APK 的资源」按固定顺序哈希，构建期注入 `BuildConfig.CONTENT_SHA256`。
+ *
+ * 运行时 `core/ContentFingerprint.kt` 用同一套规则读 APK 里的条目重算，签名之外再验一层
+ * 资源完整性（改了内嵌文档 / 字体而不重编，指纹就对不上）。只取原样复制的条目 ——
+ * 编译过的 res 两次算出来的字节不一样，不能进这里；`META-INF/xposed` 会被 R8 按混淆结果改写，
+ * 源码与 APK 不一致，同样不算。
+ *
+ * 参与计算的清单必须与 `ContentFingerprint.PREFIXES` 一致。
+ */
+val contentEntries: List<Pair<String, File>> =
+    buildList {
+        // 文档的唯一来源是仓库根的 README.md（见文件末尾 syncManual），
+        // 所以这里直接读源文件：配置期就定下来，不受 preBuild 复制顺序影响。
+        rootProject.file("../README.md").takeIf { it.isFile }?.let { add("assets/docs/manual.md" to it) }
+        layout.projectDirectory
+            .dir("src/main/assets/fonts")
+            .asFile
+            .walkTopDown()
+            .filter { it.isFile }
+            .forEach { file ->
+                val rel = file.relativeTo(layout.projectDirectory.dir("src/main/assets/fonts").asFile)
+                add("assets/fonts/" + rel.path.replace('\\', '/') to file)
+            }
+    }.sortedBy { it.first }
+
+fun computeContentSha256(): String =
+    MessageDigest.getInstance("SHA-256").let { md ->
+        contentEntries.forEach { (name, file) ->
+            md.update(name.toByteArray(Charsets.UTF_8))
+            md.update(file.readBytes())
+        }
+        md.digest().joinToString("") { "%02x".format(it) }
+    }
+
+val contentSha256: String = computeContentSha256()
 
 android {
     namespace = "com.worldmargin.autospark"
@@ -38,6 +76,8 @@ android {
         // 真源在文件顶部 appVersionCode / appVersionName，这里只引用
         versionCode = appVersionCode
         versionName = appVersionName
+        // 内容指纹真源：运行时由 ContentFingerprint 重算后比对（见 core/ContentFingerprint.kt）
+        buildConfigField("String", "CONTENT_SHA256", "\"$contentSha256\"")
     }
 
     // 按 ABI 分包：arm64-v8a / armeabi-v7a 各出一个 APK

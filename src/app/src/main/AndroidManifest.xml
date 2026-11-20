@@ -1,19 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+     权限清单只留真正用到的四个：没有 INTERNET（头像/贴纸图由宿主从抖音缓存读出来后推过来），
+     没有 SYSTEM_ALERT_WINDOW（定时唤醒走 root + monkey；设置页的「悬浮引导」是
+     PopupWindow，不需要该权限），也没有 READ/WRITE_EXTERNAL_STORAGE
+     （配置在 App 私有目录，跨进程走 ConfigProvider）。
+-->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-
-    <!-- 会话头像：优先从 CDN 拉取，失败则用本地缓存 -->
-    <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- 定时唤醒：到点拉起抖音。精确闹钟（Android 12+ 需单独授权，未授权时自动退化） -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <!-- 定时唤醒：重启后重排闹钟（否则关机一次就再也不响了） -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <!--
-         悬浮窗：定时唤醒走 root + monkey，**不依赖它**（见 DailyAlarm 注释）。
-         保留声明是因为设置页仍会显示该权限状态，且旧版本用户升级后不会掉权限。
-    -->
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- 定时唤醒：点亮屏幕（部分 ROM 上后台 Activity 需要） -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 

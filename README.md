@@ -4,8 +4,8 @@
 
 **一句话**：给「抖音判定今天还没互动」的会话，自动发一条你自己写的私信，每个会话每天最多一条。
 
-<!-- version-anchor: v2.1.2 (20006) -->
-**版本 v2.1.2**（versionCode 20006）· Android 9+ / Root / LSPosed 2.x · 仅 arm64-v8a
+<!-- version-anchor: v2.1.3 (20007) -->
+**版本 v2.1.3**（versionCode 20007）· Android 9+ / Root / LSPosed 2.x · 仅 arm64-v8a
 
 ---
 
@@ -279,6 +279,8 @@ su 0     -c "monkey -p com.ss.android.ugc.aweme ... 1"   → Events injected: 1
 | `SCHEDULE_EXACT_ALARM` | 精确定时 | 退化成 `setAndAllowWhileIdle`，可能晚十几分钟 |
 | `RECEIVE_BOOT_COMPLETED` | 重启后重排闹钟 | 关机一次就再也不响 |
 | `WAKE_LOCK` | 等发送期间撑住进程 | 抖音还在冷启动时模块进程就被回收 |
+
+本模块**不申请** `INTERNET`（头像/贴纸图由宿主从抖音缓存读出来后经 ContentProvider 推送过来）和 `SYSTEM_ALERT_WINDOW`（定时唤醒走 root + `monkey`，悬浮引导是 `PopupWindow`，都不需要该权限）。打开设置页时会在后台跑一次安装包自校验（签名证书 + 内嵌文档/字体指纹），结果写进模块日志（`自校验：签名 OK` / `资源指纹 OK`）；不匹配同样只记日志，不影响使用。
 
 ### 6.4 注意
 

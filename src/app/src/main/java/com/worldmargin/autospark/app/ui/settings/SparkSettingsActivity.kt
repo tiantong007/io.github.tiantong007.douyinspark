@@ -45,6 +45,7 @@ import com.worldmargin.autospark.app.config.model.TemplateGroup
 import com.worldmargin.autospark.app.config.TemplateOps
 import com.worldmargin.autospark.app.config.model.TemplateSource
 import com.worldmargin.autospark.app.provider.ConfigContract
+import com.worldmargin.autospark.core.SelfCheck
 import com.worldmargin.autospark.app.script.PreviewData
 import com.worldmargin.autospark.app.script.SparkScriptEngine
 import com.worldmargin.autospark.app.config.ConfigStore
@@ -269,6 +270,8 @@ class SparkSettingsActivity : Activity() {
         root.padSystemBars()
         setContentView(root)
         installGuideBubble()
+        // 安装包自校验（签名 + 内嵌资源指纹），只记日志不阻断；幂等，重复进设置页也只跑一次
+        SelfCheck.runOnce(this)
     }
 
     override fun onResume() {
@@ -1869,7 +1872,7 @@ class SparkSettingsActivity : Activity() {
                         LinearLayout.LayoutParams(dp(44), dp(44)).apply { marginEnd = dp(12) }
                     scaleType = ImageView.ScaleType.CENTER_CROP
                 }
-            AvatarLoader.load(this@SparkSettingsActivity, avatar, snapshot.avatar, snapshot.displayName)
+            AvatarLoader.load(this@SparkSettingsActivity, avatar, snapshot.peerUid, snapshot.displayName)
             addView(avatar)
             addView(
                 column().apply {
@@ -2657,7 +2660,7 @@ class SparkSettingsActivity : Activity() {
                         LinearLayout.LayoutParams(dp(36), dp(36)).apply { marginEnd = dp(10) }
                     scaleType = ImageView.ScaleType.CENTER_CROP
                 }
-            AvatarLoader.load(this@SparkSettingsActivity, avatar, snapshot?.avatar.orEmpty(), config.conversationLabel(conversationId))
+            AvatarLoader.load(this@SparkSettingsActivity, avatar, snapshot?.peerUid.orEmpty(), config.conversationLabel(conversationId))
             addView(avatar)
             addView(
                 column().apply {

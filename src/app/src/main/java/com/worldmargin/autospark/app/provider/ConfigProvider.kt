@@ -1,10 +1,12 @@
 package com.worldmargin.autospark.app.provider
 
 import android.content.ContentProvider
+import android.content.Context
 import android.content.ContentValues
 import android.database.Cursor
 import android.net.Uri
 import android.os.Bundle
+import java.io.File
 import com.worldmargin.autospark.app.config.ConfigCodec
 import com.worldmargin.autospark.app.config.ConfigStore
 
@@ -72,6 +74,17 @@ object ConfigContract {
 
     /** 写入宿主存活时间戳，Bundle["time"]。 */
     const val METHOD_TOUCH_HOST = "touchHost"
+
+    /**
+     * 写入一批会话头像：Bundle(key = 用户 id 的 MD5 十六进制, value = 图片字节)。
+     *
+     * 模块 App 不申请 `INTERNET`，头像由宿主（抖音进程）从抖音自己的缓存目录读出来后推过来，
+     * 本方法只负责落盘到 `cacheDir/avatars/<key>.png`（key 规则与 AvatarLoader.fileName 一致）。
+     */
+    const val METHOD_PUT_AVATARS = "putAvatars"
+
+    /** 头像图片 Bundle（key = uid 的 MD5，value = byte[]）。 */
+    const val KEY_IMAGES = "images"
 
     /**
      * 抖音进程 → 本模块进程：唤醒。
@@ -162,8 +175,43 @@ class ConfigProvider : ContentProvider() {
                 Bundle().apply { putBoolean(ConfigContract.KEY_OK, true) }
             }
 
+            ConfigContract.METHOD_PUT_AVATARS -> {
+                val images = extras?.getBundle(ConfigContract.KEY_IMAGES)
+                Bundle().apply { putBoolean(ConfigContract.KEY_OK, images != null && writeAvatars(context, images)) }
+            }
+
             else -> Bundle().apply { putBoolean(ConfigContract.KEY_OK, false) }
         }
+    }
+
+    /**
+     * 把一批头像字节落盘到 `cacheDir/avatars/<key>.png`。
+     *
+     * key 只接受 32 位小写十六进制（AvatarLoader.fileName 产出的形状），单张上限 512 KB：
+     * 宿主是被 hook 的进程，这一层不能无条件信任它的输入。
+     */
+    private fun writeAvatars(
+        context: Context,
+        images: Bundle,
+    ): Boolean {
+        var ok = true
+        val dir = File(context.cacheDir, "avatars")
+        images.keySet().forEach { key ->
+            val bytes = images.getByteArray(key)
+            if (HEX32.matches(key) && bytes != null && bytes.isNotEmpty() && bytes.size <= 512 * 1024) {
+                runCatching {
+                    dir.mkdirs()
+                    File(dir, "$key.png").writeBytes(bytes)
+                }.onFailure { ok = false }
+            } else {
+                ok = false
+            }
+        }
+        return ok
+    }
+
+    private companion object {
+        val HEX32 = Regex("[0-9a-f]{32}")
     }
 
     override fun query(

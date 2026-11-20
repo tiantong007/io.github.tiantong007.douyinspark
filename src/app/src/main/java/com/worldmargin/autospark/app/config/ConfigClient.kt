@@ -76,6 +76,21 @@ object ConfigClient {
                 ?.getBoolean(ConfigContract.KEY_OK) == true
         }.getOrDefault(false)
 
+    /**
+     * 推送一批会话头像给模块进程落盘（Bundle key = uid 的 MD5，value = 图片字节）。
+     *
+     * 模块不申请 `INTERNET`，头像只能由宿主从抖音自己的缓存里读出来后推过去。
+     */
+    fun putAvatars(
+        context: Context,
+        images: Bundle,
+    ): Boolean =
+        runCatching {
+            val extras = Bundle().apply { putBundle(ConfigContract.KEY_IMAGES, images) }
+            context.contentResolver.call(ConfigContract.URI, ConfigContract.METHOD_PUT_AVATARS, null, extras)
+                ?.getBoolean(ConfigContract.KEY_OK) == true
+        }.getOrDefault(false)
+
     fun putSnapshots(
         context: Context,
         snapshots: List<ConversationSnapshot>,
