@@ -58,22 +58,22 @@ object EditorSheet {
      */
     private val VAR_GROUPS = listOf(
         "时间" to listOf(
-            Triple("date", "\${ctx.builtin.date}", "今天日期，如 2026-11-26"),
-            Triple("time", "\${ctx.builtin.time}", "当前时间，如 22:14"),
-            Triple("weekday", "\${ctx.builtin.weekday}", "星期几"),
-            Triple("timestamp", "\${ctx.builtin.timestamp}", "Unix 时间戳（毫秒）"),
+            Triple("date", "ctx.builtin.date", "今天日期，如 2026-11-26"),
+            Triple("time", "ctx.builtin.time", "当前时间，如 22:14"),
+            Triple("weekday", "ctx.builtin.weekday", "星期几"),
+            Triple("timestamp", "ctx.builtin.timestamp", "Unix 时间戳（毫秒）"),
         ),
         "对方" to listOf(
-            Triple("nickname", "\${ctx.io.nickname}", "对方昵称"),
-            Triple("remark", "\${ctx.io.remark}", "对方备注名"),
-            Triple("name", "\${ctx.io.name}", "显示名（备注优先）"),
-            Triple("days", "\${ctx.io.days}", "火花天数"),
+            Triple("nickname", "ctx.io.nickname", "对方昵称"),
+            Triple("remark", "ctx.io.remark", "对方备注名"),
+            Triple("name", "ctx.io.name", "显示名（备注优先）"),
+            Triple("days", "ctx.io.days", "火花天数"),
         ),
         "会话" to listOf(
-            Triple("state", "\${ctx.io.state}", "火花状态数字（1 已燃 / 2 待燃 / 3 重燃中）"),
-            Triple("stateText", "\${ctx.io.stateText}", "状态文字，如 待续 / 已燃"),
-            Triple("peerUid", "\${ctx.io.peerUid}", "对方 UID"),
-            Triple("id", "\${ctx.io.id}", "会话 ID（UUID）"),
+            Triple("state", "ctx.io.state", "火花状态数字（1 已燃 / 2 待燃 / 3 重燃中）"),
+            Triple("stateText", "ctx.io.stateText", "状态文字，如 待续 / 已燃"),
+            Triple("peerUid", "ctx.io.peerUid", "对方 UID"),
+            Triple("id", "ctx.io.id", "会话 ID（UUID）"),
         ),
     )
 
@@ -312,12 +312,17 @@ object EditorSheet {
             .show()
     }
 
-    /** 空脚本插整句、有内容插片段 —— 与原型 pickEmoji 一致。 */
+    /** 空脚本给整句；已有内容另起一整句（表情是对象，不能和字符串相加）。 */
     private fun insertEmoji(shell: Shell, editor: EditText, name: String) {
-        if (editor.text.isBlank()) {
-            insert(editor, "ctx.result.push({ type: \"emoji\", name: \"$name\" });")
+        val stmt = "ctx.result.push({ type: \"emoji\", name: \"$name\" });"
+        val v = editor.text.toString()
+        if (v.isBlank()) {
+            editor.setText(stmt)
+            editor.setSelection(editor.text.length)
         } else {
-            insert(editor, "{ type: \"emoji\", name: \"$name\" },")
+            val glue = if (v.endsWith("\n")) "" else "\n"
+            editor.text.append(glue + stmt)
+            editor.setSelection(editor.text.length)
         }
         shell.context.tip("已插入表情「$name」")
     }
@@ -365,7 +370,7 @@ object EditorSheet {
                         addView(ctx.text(name, Tokens.T_BODY, Tokens.ACCENT, bold = true), ctx.lp(WRAP, WRAP))
                         addView(ctx.text(desc, Tokens.T_TINY, Tokens.INK_FAINT), ctx.lp(0, WRAP, 1f, left = 10))
                         setOnClickListener {
-                            insert(editor, path)
+                            insertVarSmart(editor, path)
                             dialog?.dismiss()
                         }
                     },
@@ -376,7 +381,7 @@ object EditorSheet {
 
         /** 模板自定义变量：名字自己起，路径固定是 `ctx.template.vars["名"]`。 */
         fun tplVar(name: String, desc: String): Triple<String, String, String> =
-            Triple(name, "\${ctx.template.vars[\"$name\"]}", desc)
+            Triple(name, "ctx.template.vars[\"$name\"]", desc)
 
         VAR_GROUPS.forEach { (title, vars) -> section(title, vars) }
 
@@ -450,6 +455,58 @@ object EditorSheet {
             }
             .setNegativeButton("取消", null)
             .show()
+    }
+
+    /** 最后一条 ctx.result.push(...) 的括号位置与括号内文本。 */
+    private data class PushSpan(val open: Int, val close: Int, val inner: String)
+
+    private fun findLastPush(text: String): PushSpan? {
+        val key = "ctx.result.push("
+        val idx = text.lastIndexOf(key)
+        if (idx < 0) return null
+        val open = idx + key.length - 1
+        var depth = 0
+        var inStr = false
+        var quote = ""
+        var esc = false
+        var i = open
+        while (i < text.length) {
+            val s = text[i].toString()
+            if (inStr) {
+                if (esc) esc = false
+                else if (s == "\\") esc = true
+                else if (s == quote) inStr = false
+            } else {
+                if (s == "\"" || s == "'" || s == "`") { inStr = true; quote = s }
+                else if (s == "(") depth++
+                else if (s == ")") { depth--; if (depth == 0) return PushSpan(open, i, text.substring(open + 1, i)) }
+            }
+            i++
+        }
+        return null
+    }
+
+    /**
+     * 智能插入变量：空脚本包成 ctx.result.push(path); 已有内容时，
+     * 若最后一条是字符串/表达式 push，就在它的右括号前拼 " + path"；否则另起一整句。
+     */
+    private fun insertVarSmart(editor: EditText, path: String) {
+        val v = editor.text.toString()
+        if (v.isBlank()) {
+            editor.setText("ctx.result.push($path);")
+            editor.setSelection(editor.text.length)
+            return
+        }
+        val span = findLastPush(v)
+        if (span != null && !span.inner.trimStart().startsWith("{")) {
+            val ins = " + $path"
+            editor.text.insert(span.close, ins)
+            editor.setSelection(span.close + ins.length)
+        } else {
+            val glue = if (v.endsWith("\n")) "" else "\n"
+            editor.text.append(glue + "ctx.result.push($path);")
+            editor.setSelection(editor.text.length)
+        }
     }
 
     private fun insert(editor: EditText, snippet: String) {

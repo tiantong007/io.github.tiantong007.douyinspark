@@ -24,7 +24,6 @@ import com.tiantong.spark.app.ui.v2.nav.Page
 import com.tiantong.spark.app.ui.v2.nav.PageView
 import com.tiantong.spark.app.ui.v2.nav.Shell
 import com.tiantong.spark.app.ui.v2.theme.Tokens
-import java.io.File
 import android.content.ClipData
 import android.content.ClipboardManager
 import com.tiantong.spark.BuildConfig
@@ -165,22 +164,6 @@ class SettingsScreen(private val shell: Shell) : PageView {
                 addView(ctx.divider())
                 addView(
                     ctx.settingRow(
-                        Tokens.Icon.TRASH, "表情图缓存",
-                        "预览用的表情图，删了会自动重新取", emojiCount(),
-                        onClick = { clearEmojis() },
-                    ),
-                )
-                addView(ctx.divider())
-                addView(
-                    ctx.settingRow(
-                        Tokens.Icon.BOOK, "配置文件",
-                        "模块私有目录，卸载会一起删掉", "查看路径",
-                        onClick = { showConfigPath() },
-                    ),
-                )
-                addView(ctx.divider())
-                addView(
-                    ctx.settingRow(
                         Tokens.Icon.TRASH, "清空今日已发记录",
                         "清掉后今天可以重复发（一般不用）", "",
                         color = Tokens.DANGER, glyphColor = Tokens.DANGER,
@@ -287,20 +270,6 @@ class SettingsScreen(private val shell: Shell) : PageView {
         }
     }
 
-    private fun showConfigPath() {
-        val file = File(ctx.filesDir, "spark_config.json")
-        val size = if (file.isFile) file.length() else 0
-        shell.activity.let { activity ->
-            com.tiantong.spark.app.ui.v2.comp.Sheet.open(activity, "配置文件") { body ->
-                body.addView(
-                    ctx.text(file.absolutePath, 12f, Tokens.INK).apply { setLineSpacing(ctx.dpF(4f), 1f) },
-                    ctx.lp(MATCH, WRAP, top = 8),
-                )
-                body.addView(ctx.formHint("当前 $size 字节。跨进程由 ConfigProvider 读写，不用手动改这个文件。"))
-            }
-        }
-    }
-
     // ── 诊断 ──────────────────────────────────────────────────────
 
     private fun showHostLog() {
@@ -394,23 +363,6 @@ class SettingsScreen(private val shell: Shell) : PageView {
         ) {
             shell.state.save(incoming)
             ctx.tip("已导入")
-            shell.rebuild()
-        }
-    }
-
-    private fun emojiDir(): File = File(ctx.cacheDir, "emojis")
-
-    private fun emojiCount(): String {
-        val files = emojiDir().listFiles { file -> file.extension == "png" }
-        return "${files?.size ?: 0} 张"
-    }
-
-    private fun clearEmojis() {
-        val dir = emojiDir()
-        val before = dir.listFiles()?.size ?: 0
-        ctx.confirm("清空表情图缓存", "将删除 $before 个文件，下次刷新快照会自动重新取。") {
-            runCatching { dir.listFiles()?.forEach { it.delete() } }
-            ctx.tip("已清空")
             shell.rebuild()
         }
     }

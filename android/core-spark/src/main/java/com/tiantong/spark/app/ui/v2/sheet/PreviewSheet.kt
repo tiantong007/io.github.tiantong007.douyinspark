@@ -133,7 +133,7 @@ object PreviewSheet {
         }
 
         body.addView(
-            context.formHint("表情的图由抖音渲染，这里显示的是缓存里的真实表情图；取不到就只显示名字。发送时表情自成一条，不跟文字合并。"),
+            context.formHint("表情直接以贴图显示（缓存里的真实表情图，取不到用内置贴图兜底）。发送时表情自成一条，不跟文字合并。"),
         )
     }
 
@@ -169,10 +169,6 @@ object PreviewSheet {
                         context.lp(78, 78).also { it.gravity = Gravity.CENTER },
                     )
                 }
-                addView(
-                    context.text(segment.name.ifBlank { "表情" }, 10.5f, Tokens.INK_DIM),
-                    context.lp(WRAP, WRAP, top = 4).also { it.gravity = Gravity.CENTER },
-                )
             }
         } else {
             context.text(segment.text, 13f, -1).apply {

@@ -272,10 +272,32 @@ class HomeScreen(private val shell: Shell) : PageView {
             return box
         }
 
-        items.forEachIndexed { index, snapshot ->
-            box.addView(rowOf(snapshot, member))
-            if (index != items.lastIndex) box.addView(ctx.divider())
+        val persons = items.filter { !it.isGroup }
+        val groups = items.filter { it.isGroup }
+        var sectionStarted = false
+
+        fun addSection(title: String, arr: List<ConversationSnapshot>, collapsed: Boolean, onToggle: () -> Unit) {
+            if (arr.isEmpty()) return
+            if (sectionStarted) box.addView(ctx.divider())
+            sectionStarted = true
+            box.addView(sectionHeader(title, arr.size, collapsed, onToggle))
+            if (collapsed) return
+            arr.forEach { snapshot ->
+                box.addView(ctx.divider())
+                box.addView(rowOf(snapshot, member))
+            }
         }
+
+        // 私聊在上、群聊在下；点段头折叠，只影响显示，不影响勾选与全选。
+        addSection("私聊", persons, state.gsecPerson) {
+            state.gsecPerson = !state.gsecPerson
+            shell.rebuild()
+        }
+        addSection("群聊", groups, state.gsecGroup) {
+            state.gsecGroup = !state.gsecGroup
+            shell.rebuild()
+        }
+
         // 失联条目：名单里指向已不存在的会话。不静默丢，灰行摆出来让用户自己清。
         if (ghosts.isNotEmpty()) {
             if (items.isNotEmpty()) box.addView(ctx.divider())
@@ -286,6 +308,21 @@ class HomeScreen(private val shell: Shell) : PageView {
         }
         return box
     }
+
+    /** 群/私聊分段头：▾/▸ + 标题 + 人数，整行可点折叠。 */
+    private fun sectionHeader(title: String, count: Int, collapsed: Boolean, onToggle: () -> Unit): View =
+        ctx.row().apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(ctx.dp(15), ctx.dp(10), ctx.dp(15), ctx.dp(6))
+            isClickable = true
+            setOnClickListener { onToggle() }
+            addView(
+                ctx.text(if (collapsed) "▸" else "▾", 12f, Tokens.INK_DIM, bold = true),
+                ctx.lp(WRAP, WRAP, right = 6),
+            )
+            addView(ctx.text(title, 12.5f, Tokens.INK_DIM, bold = true), ctx.lp(0, WRAP, 1f))
+            addView(ctx.text("$count", 11.5f, Tokens.INK_FAINT, bold = true), ctx.lp(WRAP, WRAP))
+        }
 
     /** 失联名单行：id 已不在会话列表里，只留着用户设过的归属。 */
     private fun ghostRow(id: String, mode: Membership): View {
@@ -395,8 +432,10 @@ class HomeScreen(private val shell: Shell) : PageView {
                 ctx.lp(WRAP, WRAP, right = 6),
             )
             nameRow.addView(ctx.icon(Tokens.Icon.FIRE, 12f, Tokens.ACCENT), ctx.lp(WRAP, WRAP, right = 3))
-            nameRow.addView(ctx.text("${snapshot.days}", 14.5f, Tokens.INK, bold = true))
-            nameRow.addView(ctx.text("天", 14.5f, Tokens.INK, bold = true))
+            if (snapshot.hasSpark) {
+                nameRow.addView(ctx.text("${snapshot.days}", 14.5f, Tokens.INK, bold = true))
+                nameRow.addView(ctx.text("天", 14.5f, Tokens.INK, bold = true))
+            }
             if (snapshot.isGroup) nameRow.addView(tag("群", Tokens.INFO, Tokens.INFO_SOFT), ctx.lp(WRAP, WRAP, left = 6))
             who.addView(nameRow, ctx.lp(MATCH, WRAP))
 
@@ -404,7 +443,7 @@ class HomeScreen(private val shell: Shell) : PageView {
             val subRow = ctx.row().apply { gravity = Gravity.CENTER_VERTICAL }
             subRow.addView(memberTag(snapshot), ctx.lp(WRAP, WRAP, right = 5))
             subRow.addView(statusTag(snapshot), ctx.lp(WRAP, WRAP))
-            if (!state.hasScript(id)) {
+            if (state.noTextNeeded(snapshot)) {
                 subRow.addView(tag("无文案", Tokens.DANGER, 0x1AE5484D), ctx.lp(WRAP, WRAP, left = 5))
             }
             val sub = subtitle(snapshot)
@@ -432,11 +471,12 @@ class HomeScreen(private val shell: Shell) : PageView {
         }
     }
 
-    /** 名单行尾的规则按钮：恢复默认 / 固定发送 / 固定不发。竖排，最多两个。 */
+    /** 名单行尾的规则按钮：默认态给「固定发送 / 固定不发」，固定后给「恢复默认 + 另一个」。竖排，最多两个。 */
     private fun rules(snapshot: ConversationSnapshot): View {
         val state = shell.state
         val id = snapshot.conversationId
         val mode = state.membershipOf(id)
+        val inList = state.inAutoList(snapshot)
         val box = ctx.column()
 
         if (mode != Membership.AUTO) {
@@ -449,7 +489,18 @@ class HomeScreen(private val shell: Shell) : PageView {
                 ctx.lp(MATCH, WRAP, bottom = 4),
             )
         }
-        if (state.inAutoList(snapshot)) {
+        if (inList && mode == Membership.AUTO) {
+            // 默认态、且在自动发送名单里：也给「固定发送」，不再只有「固定不发」
+            box.addView(
+                ruleButton("固定发送", Tokens.ACCENT, 0x0EFE2C55) {
+                    state.setMembership(id, Membership.RENEW)
+                    state.touchedId = id
+                    shell.rebuild()
+                },
+                ctx.lp(MATCH, WRAP, bottom = 4),
+            )
+        }
+        if (inList) {
             box.addView(
                 ruleButton("固定不发", 0xFF33363B.toInt(), 0x0B000000) {
                     state.setMembership(id, Membership.SKIP)
@@ -502,7 +553,11 @@ class HomeScreen(private val shell: Shell) : PageView {
             !snapshot.hasSpark && snapshot.stateText == "可点亮" -> tag("可点亮", Tokens.INFO, Tokens.INFO_SOFT)
             !snapshot.hasSpark -> tag("无火花", Tokens.MUTED, Tokens.MUTED_SOFT)
             snapshot.state == 1 -> tag("已燃", Tokens.OK, Tokens.OK_SOFT)
-            snapshot.state == 3 -> tag("重燃中", 0xFFB45309.toInt(), Tokens.WARN_SOFT)
+            snapshot.state == 3 -> {
+                val frac = Regex("""(\d+)\s*/\s*(\d+)""").find(snapshot.flameText)
+                val label = if (frac == null) "重燃中" else "重燃中 ${frac.groupValues[1]}/${frac.groupValues[2]}"
+                tag(label, 0xFFB45309.toInt(), Tokens.WARN_SOFT)
+            }
             sent -> tag("待燃", Tokens.WARN, Tokens.WARN_SOFT)
             else -> tag("待续", Tokens.WARN, Tokens.WARN_SOFT)
         }
@@ -527,12 +582,7 @@ class HomeScreen(private val shell: Shell) : PageView {
     private fun subtitle(snapshot: ConversationSnapshot): String {
         if (!shell.state.hasScript(snapshot.conversationId)) return ""
         val parts = mutableListOf<String>()
-        if (snapshot.state == 3) {
-            // 宿主原生文案是「重燃中 2/3」，状态词徽章已经有了，这里只取分数，别再抄一遍"重燃中"
-            val hit = Regex("""(\d+)\s*/\s*(\d+)""").find(snapshot.flameText)
-            val fraction = if (hit == null) null else hit.groupValues[1] + "/" + hit.groupValues[2]
-            if (fraction != null) parts += "进度 $fraction"
-        }
+        // 重燃中的进度（如 1/3）已经并在状态徽章里，这里不再重复。
         if (snapshot.expireText.isNotBlank()) parts += "火花${snapshot.expireText}"
         return parts.joinToString(" · ")
     }
@@ -546,7 +596,7 @@ class HomeScreen(private val shell: Shell) : PageView {
             "默认：只要还有火花（已燃 / 待燃 / 重燃中）就在名单里，每天自动续一次 —— 已燃只是今天续过了，明天照样续。",
             "固定发送：没火花也每天发 —— 想从头点亮没火花的人、或者已燃的大火花想额外兜底，都用这个。",
             "固定不发：永远不自动续，即使有火花、明天掉到待燃也不发；点「恢复默认」放回默认。",
-            "这张自动发送名单跟「今天发没发过」完全无关，也不影响主页手动勾选发送。",
+            "自动发送名单只按火花和固定归属判定，跟今天发没发过无关，也不影响主页手动勾选发送。",
         )
         lines.forEach { line ->
             box.addView(

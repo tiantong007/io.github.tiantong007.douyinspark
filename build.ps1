@@ -17,7 +17,8 @@
 #
 # 产物命名: release\douyinspark-arm64-v8a.apk
 param(
-    [switch]$Arm64Only
+    [switch]$Arm64Only,
+    [switch]$SkipCheck
 )
 
 $ErrorActionPreference = "Stop"
@@ -51,6 +52,14 @@ if (-not $key)   { $key = $store }
 if (-not (Test-Path $ks)) { throw "找不到 keystore: $ks（用 SPARK_KS_FILE 指定）" }
 
 $abis = if ($Arm64Only) { @("arm64-v8a") } else { @("arm64-v8a", "armeabi-v7a") }
+
+# 构建前自检：版本号同步（tools\prebuild-check.ps1；-SkipCheck 可跳过）
+$precheck = Join-Path $root "tools\prebuild-check.ps1"
+if (-not $SkipCheck -and (Test-Path $precheck)) {
+    Write-Host "[0/4] 版本号同步自检..." -ForegroundColor Cyan
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $precheck
+    if ($LASTEXITCODE -ne 0) { throw "构建前自检未通过：版本号未同步，已中止。改完再构建，或用 -SkipCheck 跳过。" }
+}
 
 Write-Host "[1/4] 编译 (assembleRelease)..." -ForegroundColor Cyan
 Push-Location "$root\android"

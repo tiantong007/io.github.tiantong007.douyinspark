@@ -19,12 +19,23 @@ object EmojiImages {
     /** 缓存文件（可能不存在）。 */
     fun file(context: Context, name: String): File = File(File(context.cacheDir, "emojis"), fileName(name))
 
-    /** 读成位图；文件不存在或解码失败返回 null。 */
+    /**
+     * 读成位图：优先宿主推来的缓存文件；没有就退回模块内置贴图（`assets/emojis/<md5>.png`）。
+     * 两边都取不到才返回 null（调用方再退内置火焰图标）。
+     */
     fun bitmap(context: Context, name: String): Bitmap? {
         val f = file(context, name)
-        if (!f.isFile) return null
-        return runCatching { BitmapFactory.decodeFile(f.absolutePath) }.getOrNull()
+        if (f.isFile) {
+            runCatching { BitmapFactory.decodeFile(f.absolutePath) }.getOrNull()?.let { return it }
+        }
+        return bundled(context, name)
     }
+
+    /** 内置贴图兜底：宿主还没推过图片时也能显示真实表情图（随包体走，安装即有）。 */
+    fun bundled(context: Context, name: String): Bitmap? =
+        runCatching {
+            context.assets.open("emojis/" + fileName(name)).use { BitmapFactory.decodeStream(it) }
+        }.getOrNull()
 
     /**
      * 当前可用的全部表情名：宿主同步来的 index.json（抖音 keva 下发的全量目录）

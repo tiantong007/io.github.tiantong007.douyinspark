@@ -73,6 +73,10 @@ class AppState(context: Context) {
     /** 刚刚被改过归属的会话 id：重建列表时把那一行标一下，否则人一移走就找不到。 */
     var touchedId: String? = null
 
+    /** 首页列表的「群聊 / 私聊」折叠状态：只影响视觉，不影响勾选与全选。 */
+    var gsecGroup: Boolean = false
+    var gsecPerson: Boolean = false
+
     /** 首页勾选的会话 id（跨刷新保留，已消失的自动剔除）。 */
     val picked: MutableSet<String> = linkedSetOf()
 
@@ -105,9 +109,7 @@ class AppState(context: Context) {
 
     /** 该续的会话：今天已经发过的 + 现在抖音还说该续的。火花天数多的排前面。 */
     fun renewable(): List<ConversationSnapshot> =
-        visible()
-            .filter { sentToday(it.conversationId) || needsRenew(it) }
-            .sortedByDescending { it.days }
+        sortedRows(visible().filter { sentToday(it.conversationId) || needsRenew(it) })
 
     /**
      * 该续但今天还没发 —— 「待续」页签与发送按钮的作用对象。
@@ -165,11 +167,13 @@ class AppState(context: Context) {
             else -> visible()
         }
         val key = query.trim()
-        if (key.isEmpty()) return base
-        return base.filter {
-            it.displayName.contains(key, ignoreCase = true) ||
-                it.conversationId.contains(key, ignoreCase = true)
-        }
+        val filtered =
+            if (key.isEmpty()) base
+            else base.filter {
+                it.displayName.contains(key, ignoreCase = true) ||
+                    it.conversationId.contains(key, ignoreCase = true)
+            }
+        return sortedRows(filtered)
     }
 
     /** 勾选且仍在当前列表里的会话 —— 首页「发送」按钮的作用对象。 */
@@ -268,6 +272,35 @@ class AppState(context: Context) {
     /** 这个会话有没有文案（没写脚本、也没挂宏 = 没有）。 */
     fun hasScript(id: String): Boolean = noBodyCount(listOf(id)) == 0
 
+    /** 该发（今天待续）却还没写文案 —— 会被跳过，列表里置顶提醒。 */
+    fun noTextNeeded(snapshot: ConversationSnapshot): Boolean =
+        !hasScript(snapshot.conversationId) && needsRenew(snapshot) && !sentToday(snapshot.conversationId)
+
+    /**
+     * 唯一比较器：无文案(0) → 有火花(1) → 无火花(2)，同级按火花天数降序，再按名字。
+     * 首页、名单、待续/已发等所有列表共用同一口径，保证同一个人在哪都排在同一个位置。
+     * 权重先整体算一遍，避免比较器里反复 hasScript → macrosFor 带来卡顿。
+     */
+    fun sortedRows(rows: List<ConversationSnapshot>): List<ConversationSnapshot> {
+        if (rows.size <= 1) return rows
+        val weight = HashMap<String, Int>(rows.size * 2)
+        rows.forEach { snapshot ->
+            val id = snapshot.conversationId
+            weight[id] = when {
+                noTextNeeded(snapshot) -> 0
+                snapshot.hasSpark -> 1
+                else -> 2
+            }
+        }
+        return rows.sortedWith(
+            compareBy(
+                { weight[it.conversationId] ?: 2 },
+                { -it.days },
+                { it.displayName },
+            ),
+        )
+    }
+
     /**
      * 第二行分段生效时列表里的人。
      *
@@ -282,17 +315,8 @@ class AppState(context: Context) {
                 it.displayName.contains(key, ignoreCase = true) ||
                     it.conversationId.contains(key, ignoreCase = true)
             }
-        // 权重只算一次：在比较器里反复调 hasScript 会反复走 macrosFor，几百个会话就看得见卡。
-        val weight = HashMap<String, Int>(filtered.size * 2)
-        filtered.forEach { snapshot ->
-            val id = snapshot.conversationId
-            weight[id] = when {
-                !hasScript(id) -> 0
-                membershipOf(id) != Membership.AUTO -> 1
-                else -> 2
-            }
-        }
-        return filtered.sortedWith(compareBy({ weight[it.conversationId] ?: 2 }, { -it.days }))
+        // 统一比较器：无文案 → 有火花(天数降序) → 无火花(天数降序)，与看板/其它列表同一口径。
+        return sortedRows(filtered)
     }
 
     /** 当前该渲染的列表：第二行分段优先，否则走五档 + 搜索词。 */
