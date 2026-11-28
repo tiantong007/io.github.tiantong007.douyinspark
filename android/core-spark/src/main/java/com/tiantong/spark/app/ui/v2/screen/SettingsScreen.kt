@@ -297,15 +297,10 @@ class SettingsScreen(private val shell: Shell) : PageView {
         (ctx.getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager)
             .isIgnoringBatteryOptimizations(ctx.packageName)
 
-    private fun notifOk(): Boolean =
-        (ctx.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as android.app.NotificationManager)
-            .areNotificationsEnabled()
-
     private fun alarmPermSummary(): String {
         val missing = ArrayList<String>()
         if (!exactAlarmOk()) missing.add("精确闹钟")
         if (!batteryOk()) missing.add("电池不限制")
-        if (!notifOk()) missing.add("通知")
         return if (missing.isEmpty()) "已就绪" else "还需：" + missing.joinToString("、")
     }
 
@@ -347,11 +342,6 @@ class SettingsScreen(private val shell: Shell) : PageView {
             rowPrem(
                 "电池不限制", "防止后台被省电策略冻结", batteryOk(),
                 android.content.Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, android.net.Uri.parse(pkg)),
-            )
-            rowPrem(
-                "通知权限", "发送结果提醒", notifOk(),
-                android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                    .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, ctx.packageName),
             )
             rowPrem(
                 "自启动 / 后台", "部分国产 ROM 需在系统里允许自启动", false,

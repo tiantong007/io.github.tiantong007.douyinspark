@@ -38,8 +38,8 @@ android {
     defaultConfig {
         // 应用 id 与版本号唯一真源：发版只改这三行
         applicationId = "io.github.tiantong007.douyinspark"
-        versionCode = 34600
-        versionName = "v3.4.6"
+        versionCode = 34700
+        versionName = "v3.4.7"
         minSdk = 28
         targetSdk = 36
     }

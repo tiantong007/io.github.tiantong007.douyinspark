@@ -556,7 +556,11 @@ class HomeScreen(private val shell: Shell) : PageView {
             !snapshot.hasSpark && snapshot.stateText == "可点亮" -> tag("可点亮", Tokens.INFO, Tokens.INFO_SOFT)
             !snapshot.hasSpark -> tag("无火花", Tokens.MUTED, Tokens.MUTED_SOFT)
             snapshot.state == 1 -> tag("已燃", Tokens.OK, Tokens.OK_SOFT)
-            snapshot.state == 3 -> tag("重燃中", 0xFFB45309.toInt(), Tokens.WARN_SOFT)
+            snapshot.state == 3 -> {
+                val m = Regex("(\\d+)\\s*/\\s*(\\d+)").find(snapshot.flameText)
+                val label = if (m != null) "重燃中 ${m.groupValues[1]}/${m.groupValues[2]}" else "重燃中"
+                tag(label, 0xFFB45309.toInt(), Tokens.WARN_SOFT)
+            }
             sent -> tag("待燃", Tokens.WARN, Tokens.WARN_SOFT)
             else -> tag("待续", Tokens.WARN, Tokens.WARN_SOFT)
         }
