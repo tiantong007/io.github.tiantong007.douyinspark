@@ -30,6 +30,17 @@ object ConfigCodec {
     private const val KEY_ALARM_MINUTE = "alarmMinute"
     private const val KEY_ALARM_ASKED = "alarmAsked"
     private const val KEY_CHECK_AT_ALARM_ONLY = "checkAtAlarmOnly"
+    private const val KEY_AFTER_RUN_ACTION = "afterRunAction"
+    private const val KEY_MUTE_DURING_RUN = "muteDuringRun"
+    private const val KEY_RETRY_ENABLED = "retryEnabled"
+    private const val KEY_RETRY_START_HOUR = "retryStartHour"
+    private const val KEY_RETRY_START_MINUTE = "retryStartMinute"
+    private const val KEY_RETRY_REPEAT_COUNT = "retryRepeatCount"
+    private const val KEY_RETRY_INTERVAL_MIN = "retryIntervalMin"
+    private const val KEY_RETRY_MAX_ROUNDS = "retryMaxRounds"
+    private const val KEY_RETRY_ROUND = "retryRound"
+    private const val KEY_RETRY_PENDING = "retryPending"
+    private const val KEY_RETRY_DAY = "retryDay"
     private const val KEY_MACROS = "macros"
     private const val KEY_FUNCTIONS = "functions"
         private const val KEY_SANDBOX = "sandbox"
@@ -166,6 +177,17 @@ object ConfigCodec {
             .put(KEY_ALARM_MINUTE, config.alarmMinute)
             .put(KEY_ALARM_ASKED, config.alarmAsked)
             .put(KEY_CHECK_AT_ALARM_ONLY, config.checkAtAlarmOnly)
+            .put(KEY_AFTER_RUN_ACTION, config.afterRunAction)
+            .put(KEY_MUTE_DURING_RUN, config.muteDuringRun)
+            .put(KEY_RETRY_ENABLED, config.retryEnabled)
+            .put(KEY_RETRY_START_HOUR, config.retryStartHour)
+            .put(KEY_RETRY_START_MINUTE, config.retryStartMinute)
+            .put(KEY_RETRY_REPEAT_COUNT, config.retryRepeatCount)
+            .put(KEY_RETRY_INTERVAL_MIN, config.retryIntervalMin)
+            .put(KEY_RETRY_MAX_ROUNDS, config.retryMaxRounds)
+            .put(KEY_RETRY_ROUND, config.retryRound)
+            .put(KEY_RETRY_PENDING, config.retryPending)
+            .put(KEY_RETRY_DAY, config.retryDay)
             .toString()
     }
 
@@ -314,6 +336,17 @@ object ConfigCodec {
             alarmMinute = root.optInt(KEY_ALARM_MINUTE, 0),
             alarmAsked = root.optBoolean(KEY_ALARM_ASKED),
             checkAtAlarmOnly = root.optBoolean(KEY_CHECK_AT_ALARM_ONLY, true),
+            afterRunAction = root.optString(KEY_AFTER_RUN_ACTION, "restore"),
+            muteDuringRun = root.optBoolean(KEY_MUTE_DURING_RUN, true),
+            retryEnabled = root.optBoolean(KEY_RETRY_ENABLED, false),
+            retryStartHour = root.optInt(KEY_RETRY_START_HOUR, 22),
+            retryStartMinute = root.optInt(KEY_RETRY_START_MINUTE, 0),
+            retryRepeatCount = root.optInt(KEY_RETRY_REPEAT_COUNT, 1),
+            retryIntervalMin = root.optInt(KEY_RETRY_INTERVAL_MIN, 15),
+            retryMaxRounds = root.optInt(KEY_RETRY_MAX_ROUNDS, 3),
+            retryRound = root.optInt(KEY_RETRY_ROUND, 0),
+            retryPending = root.optBoolean(KEY_RETRY_PENDING, false),
+            retryDay = root.optString(KEY_RETRY_DAY, ""),
         )
     }
 

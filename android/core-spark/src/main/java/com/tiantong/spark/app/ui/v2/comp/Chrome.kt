@@ -229,7 +229,7 @@ fun Context.settingRow(
     row().apply {
         setPadding(dp(4), dp(11), dp(4), dp(11))
         layoutParams = lp(MATCH, WRAP)
-        addView(icon(glyph, 17f, glyphColor), lp(30, WRAP))
+        if (glyph.isNotBlank()) addView(icon(glyph, 17f, glyphColor), lp(30, WRAP))
         addView(
             column().apply {
                 addView(text(title, Tokens.T_BODY, color))

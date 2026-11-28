@@ -9,103 +9,54 @@ import android.os.Build
 import java.util.Calendar
 
 /**
- * 每天定时把抖音拉起来，让模块有机会跑一轮自动续火花。
+ * 定时唤醒：用 AlarmManager 在每天固定时刻把抖音拉起来。
  *
- * ## 为什么需要它
- *
- * 模块的代码跑在**抖音进程里**（LSPosed 注入）。抖音没启动 = 没有任何代码在跑，
- * 所以「锁屏状态下也能自动发」只能靠外部把抖音启动起来：
- *
- * ```
- * AlarmManager 到点 → AlarmReceiver（本模块进程）
- *                   → 优先免 root：抖音 preload provider 拉起主进程
- *                     （不可达则回退 root + monkey，不亮屏）
- *                   → 抖音进程启动 → Application.attach 被 hook
- *                   → scheduleOnAppStart() → 扫描 + 发送
- *                   → AlarmReceiver 检测到已发 → am force-stop 关掉
- * ```
- *
- * 发送本身不需要屏幕亮着、也不需要解锁 —— 它只走 IM SDK 的发送链路。
- *
- * ## 为什么优先免 root、再回退 monkey
- *
- * 免 root 走 `content://<抖音包>.depths.pre.load` 的 provider client，取 client 会顺带
- * 把抖音主进程拉起来，不需要 su；provider 不可达时再回退 root + `monkey`
- * （`monkey -p <pkg> -c LAUNCHER 1` 走 AMS 注入通道，锁屏 + Doze 下能拉起且不亮屏，
- * 但只接受 root / shell 身份，普通 App 执行会被 `Killed`）。
- *
- * 两条路都不用 startActivity：后台 startActivity 会被 `backgroundActivityAllowed=false` 拦，
- * 且会亮屏、打断用户正在用的应用。
- *
- * ## 权限
- *
- * - Android 12+ 精确闹钟需要 `SCHEDULE_EXACT_ALARM`。没拿到时退化成
- *   [AlarmManager.setAndAllowWhileIdle]（不精确，doze 下最多晚十几分钟，够用）。
+ * - [schedule] 主入口：排下一次闹钟 + 登记/取消 15 分钟兜底 Job（App 启动、改设置、闹钟响后用）。
+ * - [arm] 只排「下一次闹钟」，**不碰**兜底 Job。兜底 Job 自己重排时必须用这个，否则会自触发死循环。
+ * - [scheduleRetryAt] 安排一次「补发」闹钟（一次性）。
+ * - [launchDouyin] 优先免 root（preload provider），失败回退 root + monkey。
  */
 object DailyAlarm {
     private const val REQUEST_CODE = 0x5A17
+    private const val RETRY_REQUEST_CODE = 0x5A19
 
     const val ACTION_ALARM = "com.tiantong.spark.action.DAILY_ALARM"
+    const val ACTION_RETRY = "com.tiantong.spark.action.RETRY_ALARM"
 
-    /** 抖音包名。monkey 用它找入口，硬编码比动态查询可靠。 */
     private const val DOUYIN_PACKAGE = "com.ss.android.ugc.aweme"
 
-    /** 下一次触发的时间戳；[hour] 为 -1 时返回 0（未启用）。 */
-    fun nextTriggerAt(
-        hour: Int,
-        minute: Int,
-        now: Long = System.currentTimeMillis(),
-    ): Long {
-        if (hour !in 0..23) return 0L
-        val calendar =
-            Calendar.getInstance().apply {
-                timeInMillis = now
-                set(Calendar.HOUR_OF_DAY, hour)
-                set(Calendar.MINUTE, minute.coerceIn(0, 59))
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-            }
-        // 今天这个点已经过了（或正好是现在）→ 排到明天
+    /** 今天 hour:minute 是否已经过了；过了就取明天。返回毫秒时间戳。 */
+    fun nextTriggerAt(hour: Int, minute: Int, now: Long = System.currentTimeMillis()): Long {
+        val calendar = Calendar.getInstance()
+        calendar.timeInMillis = now
+        calendar.set(Calendar.HOUR_OF_DAY, hour)
+        calendar.set(Calendar.MINUTE, minute)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
         if (calendar.timeInMillis <= now) calendar.add(Calendar.DAY_OF_YEAR, 1)
         return calendar.timeInMillis
     }
 
-    /**
-     * 按配置重排闹钟。**每次 App 启动 / 改设置 / 闹钟响过之后都要调一次**，
-     * 因为精确闹钟是一次性的，响完要自己排下一天。
-     */
-    fun schedule(
-        context: Context,
-        hour: Int,
-        minute: Int,
-    ) {
-        val manager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
-        val pending = pendingIntent(context)
-        if (manager == null || pending == null) return
-        cancel(context)
-        if (hour !in 0..23) {
-            ScheduleGuardService.cancel(context)
-            return
-        }
+    /** 只排「下一次闹钟」，不碰兜底 Job（兜底 Job 内部重排专用，避免自触发）。 */
+    fun arm(context: Context, hour: Int, minute: Int) {
+        val manager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+        val pending = pendingIntent(context) ?: return
+        runCatching { manager.cancel(pending) }
+        if (hour !in 0..23) return
         val at = nextTriggerAt(hour, minute)
-        if (at <= 0L) {
+        if (at <= 0L) return
+        setExact(manager, at, pending)
+    }
+
+    /** 主入口：排闹钟 + 登记/取消兜底 Job。 */
+    fun schedule(context: Context, hour: Int, minute: Int) {
+        if (hour !in 0..23 || nextTriggerAt(hour, minute) <= 0L) {
+            cancel(context)
             ScheduleGuardService.cancel(context)
             return
         }
-        // 调度兜底：登记一个 15 分钟周期 JobScheduler，防单一 alarm 被厂商冻结/清掉后彻底不响
+        arm(context, hour, minute)
         ScheduleGuardService.schedule(context)
-
-        // 先试精确闹钟；没权限就退到「doze 也能响但不精确」
-        val exact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || manager.canScheduleExactAlarms()
-        runCatching {
-            if (exact) {
-                manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending)
-            } else {
-                manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending)
-            }
-        }.onFailure {
-            runCatching { manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending) }
-        }
     }
 
     fun cancel(context: Context) {
@@ -114,58 +65,66 @@ object DailyAlarm {
         runCatching { manager.cancel(pending) }
     }
 
-    /** 精确闹钟是否可用（Android 12 以下恒为 true）。 */
+    /** 安排一次「补发」闹钟（一次性）：到点只拉起抖音，由抖音进程跑补发轮。 */
+    fun scheduleRetryAt(context: Context, at: Long) {
+        val manager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+        val pending = retryPendingIntent(context) ?: return
+        runCatching { manager.cancel(pending) }
+        if (at <= System.currentTimeMillis()) return
+        setExact(manager, at, pending)
+    }
+
+    fun cancelRetry(context: Context) {
+        val manager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+        val pending = retryPendingIntent(context) ?: return
+        runCatching { manager.cancel(pending) }
+    }
+
+    private fun setExact(manager: AlarmManager, at: Long, pending: PendingIntent) {
+        val exact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || manager.canScheduleExactAlarms()
+        runCatching {
+            if (exact) {
+                manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending)
+            } else {
+                manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending)
+            }
+        }.onFailure {
+            // 没有精确闹钟权限时退化为非精确，别让功能整体失效
+            runCatching { manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending) }
+        }
+    }
+
     fun canScheduleExact(context: Context): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
         val manager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return false
-        return manager.canScheduleExactAlarms()
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.S || manager.canScheduleExactAlarms()
     }
 
     /**
-     * 拉起抖音，两条路：**先免 root，失败再回退 root + monkey**。
-     *
-     * 1. 免 root：`acquireUnstableContentProviderClient` 向抖音 preload provider 取 client，
-     *    会触发抖音主进程启动，不需要 su（见 [tryPreload]）。
-     * 2. 回退 root：`monkey -p <pkg> -c LAUNCHER 1` 走 AMS 注入通道，实测不点亮屏幕
-     *    （`mWakefulness` 保持 Asleep）且能清掉 `stopped=true`；但它要求 root / shell 身份，
-     *    普通 App 身份跑会被 `Killed`（见 [RootShell.monkeyLaunch]）。
-     *
-     * 都不用 startActivity：Android 10+ 的 `backgroundActivityAllowed=false` 会拦后台
-     * startActivity，且会亮屏、打断用户正在用的应用，不可靠。
-     *
-     * @return 用了哪条路，用于日志对账。
+     * 拉起抖音：先试免 root 的 `depths.pre.load` 内容提供者（不弹窗、不需要 root），
+     * 失败再回退 root + monkey。
      */
     fun launchDouyin(context: Context): LaunchMethod {
-        // 1) 先试免 root：向抖音 preload provider 取 client 会拉起抖音主进程，不需要 su
         if (tryPreload(context)) return LaunchMethod.PRELOAD
-        // 2) 免 root 失败再回退 root + monkey（不亮屏）
         return RootShell.monkeyLaunch(DOUYIN_PACKAGE) ?: LaunchMethod.FAILED
     }
 
-    /**
-     * 免 root 拉起：`acquireUnstableContentProviderClient` 会触发目标进程（抖音）启动。
-     * provider 未导出 / 不存在时抛异常或返回 null，一律当作失败，交给 root 兜底。
-     */
     private fun tryPreload(context: Context): Boolean =
         runCatching {
             val uri = Uri.parse("content://$DOUYIN_PACKAGE.depths.pre.load")
-            val client = context.contentResolver.acquireUnstableContentProviderClient(uri) ?: return@runCatching false
-            runCatching { client.close() }
-            true
+            val client = context.contentResolver.acquireUnstableContentProviderClient(uri)
+            if (client != null) {
+                runCatching { client.close() }
+                true
+            } else {
+                false
+            }
         }.getOrDefault(false)
 
-    /** 把抖音关掉。 */
     fun stopDouyin(): Boolean = RootShell.amKill(DOUYIN_PACKAGE)
 
-    /** 拉起方式，用于日志与界面提示。 */
     enum class LaunchMethod {
-        /** root + monkey，不亮屏 */
-        MONKEY,
-
-        /** 免 root：preload provider 拉起抖音主进程 */
         PRELOAD,
-
-        /** 没成功（preload 与 root 都没成 / 抖音没装） */
+        MONKEY,
         FAILED,
     }
 
@@ -175,6 +134,16 @@ object DailyAlarm {
                 context,
                 REQUEST_CODE,
                 Intent(context, AlarmReceiver::class.java).setAction(ACTION_ALARM),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        }.getOrNull()
+
+    private fun retryPendingIntent(context: Context): PendingIntent? =
+        runCatching {
+            PendingIntent.getBroadcast(
+                context,
+                RETRY_REQUEST_CODE,
+                Intent(context, AlarmReceiver::class.java).setAction(ACTION_RETRY),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
         }.getOrNull()

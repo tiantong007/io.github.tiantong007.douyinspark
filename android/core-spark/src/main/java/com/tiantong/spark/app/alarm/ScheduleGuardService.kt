@@ -29,8 +29,9 @@ class ScheduleGuardService : JobService() {
         runCatching {
             val config = ConfigStore.load(applicationContext)
             if (config.alarmHour in 0..23) {
-                // 只重排，不触发发送（见类注释：避免与主闹钟重复发）
-                DailyAlarm.schedule(applicationContext, config.alarmHour, config.alarmMinute)
+                // 只重排「闹钟本身」，绝不重新登记本 Job —— 否则会在 onStartJob 里再次
+                // 登记自己，形成「取消闹钟→立刻再响→再取消」的无限循环，闹钟永远不响。
+                DailyAlarm.arm(applicationContext, config.alarmHour, config.alarmMinute)
             }
         }.onFailure { Log.w(TAG, "调度兜底重排闹钟失败", it) }
         // 没有异步工作，直接结束

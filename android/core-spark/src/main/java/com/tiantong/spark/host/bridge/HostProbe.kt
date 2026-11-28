@@ -93,6 +93,11 @@ internal fun hintModuleStoppedOncePerDay(
 
 fun scheduleOnAppStart() {
     val context = HostRuntime.context ?: return
+    // 补发轮：模块用补发闹钟把抖音拉起时，优先跑补发（不受检查时间窗限制）
+    if (ConfigClient.read(context)?.retryPending == true) {
+        runRetryRound(context)
+        return
+    }
     // 只在设定时间检查：不在窗口内直接返回，不白跑 60 秒的 IM 探测
     if (!shouldCheckNow(context)) {
         ModLog.i("不在检查时间窗内，本次不检查")
@@ -153,4 +158,73 @@ fun scheduleOnAppStart() {
         },
         "spark-autospark",
     ).apply { isDaemon = true }.start()
+}
+
+/**
+ * 补发轮：模块用补发闹钟把抖音拉起时走这里。对**今天已发过但仍没点亮**的会话
+ * （state 仍 2/3）重复发同一条文案（条数取 retryRepeatCount），发完 touch 一下
+ * 标记文件让模块进程的 watchAndClose 收尾，并按需安排下一轮。
+ */
+private fun runRetryRound(context: Context) {
+    Thread(
+        {
+            wakeModule(context)
+            HostTrace.start(context, "补发轮：探测 IM 就绪，就绪即补发")
+            runCatching {
+                Thread.sleep(START_DELAY_MS)
+                var attempt = 0
+                var outcome = refreshSnapshot(context, light = true)
+                while (!outcome.ok) {
+                    attempt++
+                    if (attempt >= MAX_ATTEMPTS) {
+                        HostTrace.add(context, "补发：探测 $MAX_ATTEMPTS 次仍未就绪，本次跳过")
+                        com.tiantong.spark.core.DouToastHelper.show(context, "（续火花补发：IM 未就绪，本次跳过）")
+                        return@runCatching
+                    }
+                    Thread.sleep(RETRY_DELAY_MS)
+                    outcome = refreshSnapshot(context, light = true)
+                }
+                refreshSnapshot(context)
+                val cfg = ConfigClient.read(context) ?: return@runCatching
+                val ids = pendingRetryIds(cfg)
+                // 先清掉 pending，避免下一次冷启动把它当补发轮重复跑
+                runCatching { ConfigClient.write(context, cfg.copy(retryPending = false)) }
+                if (ids.isEmpty()) {
+                    HostTrace.add(context, "补发：没有仍未点亮的会话，跳过")
+                } else {
+                    val summary =
+                        runRenew(
+                            context,
+                            respectEnabled = true,
+                            only = ids,
+                            ignoreSentToday = true,
+                            repeatCount = cfg.retryRepeatCount.coerceAtLeast(1),
+                        )
+                    val line =
+                        "补发结果：已发 ${summary.optJSONArray("sent")?.length() ?: 0} / " +
+                            "跳过 ${summary.optJSONArray("skipped")?.length() ?: 0} / " +
+                            "失败 ${summary.optJSONArray("failed")?.length() ?: 0}"
+                    HostTrace.add(context, line)
+                    ModLog.i(line)
+                }
+                // 无论成败都 touch「今天已跑过」文件，让模块进程的 watchAndClose 唤醒并收尾
+                markRunDay(context, dayKey(Date()))
+            }.onFailure {
+                HostTrace.add(context, "补发异常：${it.message ?: it.toString()}")
+                ModLog.e("补发轮执行异常", it)
+            }
+        },
+        "spark-retry",
+    ).apply { isDaemon = true }.start()
+}
+
+/** 今天已发过、但火花仍未点亮（state 2/3）的会话 id。 */
+private fun pendingRetryIds(config: SparkConfig): Set<String> {
+    val today = dayKey(Date())
+    val result = LinkedHashSet<String>()
+    config.snapshots.forEach { snapshot ->
+        val sentToday = config.sentDays[snapshot.conversationId] == today
+        if (sentToday && snapshot.state in 2..3) result.add(snapshot.conversationId)
+    }
+    return result
 }

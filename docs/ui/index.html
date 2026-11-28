@@ -309,7 +309,7 @@ font-size:13px;padding:10px 16px;border-radius:12px;opacity:0;transition:.2s;z-i
 .dlist{max-height:300px;overflow:auto}
 .dlist a{display:block;padding:12px 4px;border-bottom:1px solid var(--line);font-size:14.5px;color:var(--ink);cursor:pointer}
 .sec{display:flex;align-items:center;justify-content:space-between;padding:18px 4px 8px}
-.sec .sublabel{padding:0}
+.sec .sublabel{padding:0;font-size:14.5px;color:var(--ink)}
 .sec .q{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--faint);color:var(--faint);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:help;flex:0 0 18px}
 .dangerRow .tt{color:var(--danger)}.dangerRow .gi{color:var(--danger)}
 </style></head><body>
@@ -348,8 +348,8 @@ font-size:13px;padding:10px 16px;border-radius:12px;opacity:0;transition:.2s;z-i
 
 抖音「自动续火花」LSPosed 模块。给抖音判定今天还没互动的会话，自动发一条你自己写的私信，每会话每天最多一条。
 
-<!-- version-anchor: v3.4.7 (34700) -->
-**v3.4.7**（versionCode 34700）· Android 9+ / Root / LSPosed 2.x · arm64-v8a
+<!-- version-anchor: v3.4.8 (34800) -->
+**v3.4.8**（versionCode 34800）· Android 9+ / Root / LSPosed 2.x · arm64-v8a
 
 ## 界面预览
 
@@ -369,6 +369,7 @@ font-size:13px;padding:10px 16px;border-radius:12px;opacity:0;transition:.2s;z-i
 - **自动续火花**：五档分类（全部 / 已燃 / 待燃 / 待续 / 无火花）；第二行另有一套发送名单（自动发送 / 不发送），决定「该续的时候谁会被自动续」，该发的自动发，也可以手动勾选发
 - **互动表情**：发抖音的火焰表情（`msgType=5`），不是文字；目录从抖音配置里读，当前 21 个
 - **定时唤醒**：每天到点拉起抖音发完再关掉，不亮屏、不解锁（优先免 root 预加载，失败自动回退 root；另有 15 分钟 JobScheduler 调度兜底）
+- **执行与补发**：任务跑完可「回到运行前的应用 / 关闭抖音 / 留在抖音」；运行期间可静音并自动恢复；对今天还没点亮的会话可按条数 / 间隔 / 轮数重复补发同一条
 - **模板**：内置 2 个，自定义支持继承（跟随父模板）和克隆（复制后独立）
 - **零联网**：不申请 `INTERNET`，头像和表情图都由抖音进程取好后推过来（表情图不打包进 APK，运行时从抖音下载并缓存到 `cache/emojis`；缓存就绪前预览先显示火焰图标兜底）
 
@@ -397,7 +398,7 @@ font-size:13px;padding:10px 16px;border-radius:12px;opacity:0;transition:.2s;z-i
 
 **变量**：不再单独占一页。变量是**模板配置**——模板里写 `<名字>` + `<表达式>`，脚本里用 `${ctx.template.vars["名字"]}` 取；编辑器里的「变量」按钮只负责把路径插进光标处，内置路径都是 `ctx.builtin.*` / `ctx.io.*`，会话层同名覆盖模板层。
 
-**设置**：续火花（自动续火花 / 只在设定时间检查）、定时唤醒（开关 / 唤醒时间 / 权限检查 / 调度兜底 / 唤醒日志）、数据与工具（运行日志 / 系统诊断）、关于（版本 / 许可与来源 / 源码 / 使用文档）。顶部有概览卡（自动续火花状态 · 每天几点唤醒 · 调度兜底 · 只在设定时间）。
+**设置**：续火花分组下按执行顺序集中了自动续火花 → 定时唤醒（开关 / 只在设定时间检查 / 唤醒时间 / 权限检查 / 调度兜底 / 唤醒日志）→ 待燃补发（开始时间 / 每次条数 / 间隔 / 最多轮数）→ 任务完成后与运行期间静音；另有数据与工具（运行日志 / 系统诊断）、关于（版本 / 许可与来源 / 源码 / 使用文档）。顶部有概览卡（自动续火花状态 · 每天几点唤醒 · 调度兜底 · 只在设定时间）。
 
 **编辑弹层**：会话模式底部四个按钮——模板 / 表情 / 变量 / 预览（模板模式没有「模板」按钮）。表情点开是 21 个表情的网格，内容空就插整句、非空就插片段。保存时自动清掉零宽字符和中文引号。
 
@@ -427,6 +428,21 @@ font-size:13px;padding:10px 16px;border-radius:12px;opacity:0;transition:.2s;z-i
 申请 4 个权限：`SCHEDULE_EXACT_ALARM` `USE_EXACT_ALARM` `RECEIVE_BOOT_COMPLETED` `WAKE_LOCK`。没有 `INTERNET`、没有悬浮窗、没有存储权限。
 
 注意：手动「一键清理」会把闹钟一起清掉，需要手动开一次本模块 App 恢复。
+
+## 任务完成后 / 静音 / 待燃补发
+
+**任务完成后**（三选一）：`回到运行前的应用`（默认，运行前在哪个 App 就切回哪个）/ `关闭抖音` / `留在抖音`。运行前如果是息屏状态，跑完只关抖音、不点亮别的应用。
+
+**运行期间静音**：开跑前把媒体 / 铃声 / 通知音量降到 0，跑完恢复原音量（原音量存在模块侧，崩溃或被杀后下次启动也会还原，不会把手机永久静音）。
+
+**待燃补发**（默认关）：对今天已经发过、但火花**还没点亮**的会话（状态仍是「待燃 / 重燃中」），隔一段时间**重复发同一条文案**，直到点亮或用完当天轮数。可设：
+
+- 开始补发时间：从几点起才允许补发，之前不补（默认 22:00，也可设为「不限」到点就补）；
+- 每次发几条：同一会话一次连发几条相同文案；
+- 补发间隔：两轮之间隔几分钟（受系统限制，实际最小约 15 分钟）；
+- 最多补发轮数：每天最多补几轮，用完即停，跨天自动清零。
+
+补发不改变「每会话每天最多一条」的常规口径 —— 它是对同一批仍未点亮会话的额外重试，条数和轮数都由你控制。
 
 ## 脚本 API
 
@@ -495,7 +511,7 @@ download:'\ueac2',import:'\ueac3',lock:'\uea75',more:'\uea7c',old:'\ueb28',clipp
 const ic = (k, sz, col) => '<span class="ic" style="font-size:' + (sz||15) + 'px' + (col ? ';color:' + col : '') + '">' + IC[k] + '</span>';
 
 const S = {page:'home', filter:0, pfilter:0, mstat:-1, picked:new Set(), enabled:D.enabled, checkAtAlarm:false,
-  alarm:[D.ah, D.am], alarmOn:true, perm:{exact:true, auto:false, battery:false, lock:false}, drawer:false, tpls:D.tpl.slice(), sheet:null, preview:null, gsec:{group:false, person:false}};
+  alarm:[D.ah, D.am], alarmOn:true, perm:{exact:true, auto:false, battery:false, lock:false}, drawer:false, tpls:D.tpl.slice(), sheet:null, preview:null, gsec:{group:false, person:false}, afterRun:'restore', muteOn:true, retryOn:false, retryStart:22, retryRepeat:1, retryInterval:15, retryMax:3};
 
 const TITLES = {home:'状态看板', templates:'模板', settings:'设置', docs:'使用文档'};
 // 无火花：没有状态文本（还没建立火花），或状态是「可点亮」这类未点亮的
@@ -915,26 +931,30 @@ function settings(){
     '</div></div>';
 
   // 续火花
-  h += secHead('续火花', '打开后在抖音进程里自动检查并发送；关掉只能手动发。');
-  h += '<div class="card" style="padding-top:6px;padding-bottom:6px">' +
-    trow('自动续火花', '打开抖音时自动检查并发送', on, 'S.enabled=!S.enabled;render()') +
-    trow('只在设定时间检查', '关掉就是每次打开抖音都检查一遍', at, 'S.checkAtAlarm=!S.checkAtAlarm;render()') +
-    '</div>';
-
-  // 定时唤醒（开关；打开时自动做权限检测并引导）
-  h += secHead('定时唤醒', '优先免 root 拉起抖音（preload provider），失败回退 root + monkey；发完 force-stop。');
-  h += '<div class="card" style="padding-top:6px;padding-bottom:6px">' +
-    trow('定时唤醒', '开启后到点自动打开抖音，锁屏也能发', S.alarmOn, 'toggleAlarm()');
+  h += secHead('续火花', '自动续火花、任务收尾、补发、定时唤醒都集中在这里；关掉「自动续火花」只能手动发。');
+    h += '<div class="card" style="padding-top:6px;padding-bottom:6px">';
+  h += trow('自动续火花', '打开抖音时自动检查并发送', on, 'S.enabled=!S.enabled;render()');
+  h += groupGap();
+  h += trow('定时唤醒', '开启后到点自动打开抖音，锁屏也能发', S.alarmOn, 'toggleAlarm()');
   if (S.alarmOn) {
-    h += irow('refresh', '唤醒时间', '每天这个时间自动叫醒抖音', tstr, 'pickTime()') + permRow();
+    h += trow('只在设定时间检查', '关掉就是每次打开抖音都检查一遍', at, 'S.checkAtAlarm=!S.checkAtAlarm;render()') +
+      irow('refresh', '唤醒时间', '每天这个时间自动叫醒抖音', tstr, 'pickTime()') + permRow();
     h += '<div class="iconrow" style="cursor:default"><span class="ic gi">' + IC.shield + '</span>' +
       '<div class="mid"><div class="tt">调度兜底</div><div class="st">定时唤醒被系统清掉时，每 15 分钟自动补排一次</div></div>' +
       '<span class="tag done">正常</span></div>';
     h += wakeRow();
-  } else {
-    h += '<div class="iconrow" style="cursor:default"><span class="ic gi">' + IC.shield + '</span>' +
-      '<div class="mid"><div class="tt">已关闭</div><div class="st">开启后才会到点唤醒；可设置时间、查看唤醒日志</div></div></div>';
   }
+  h += groupGap();
+  h += trow('待燃补发','对今天还没点亮的会话隔一段再发同一条，直到点亮或用完轮数', S.retryOn, 'S.retryOn=!S.retryOn;render()');
+  if (S.retryOn) {
+    h += irow('refresh','开始补发时间','从几点起允许补发；之前不补', S.retryStart>=0?hhmm(S.retryStart,0):'不限（到点就补）', 'pickRetryStart()') +
+      irow('refresh','每次发几条','同一个会话一次连发几条相同文案', S.retryRepeat+' 条', "editNum('每次发几条', S.retryRepeat, 1, 20, function(v){S.retryRepeat=v;render()})") +
+      irow('refresh','补发间隔','两轮之间隔几分钟（系统最小约 15 分钟）', S.retryInterval+' 分钟', "editNum('补发间隔（分钟）', S.retryInterval, 1, 1440, function(v){S.retryInterval=v;render()})") +
+      irow('refresh','最多补发轮数','每天最多补发几轮，用完就停', S.retryMax+' 轮', "editNum('最多补发轮数', S.retryMax, 0, 20, function(v){S.retryMax=v;render()})");
+  }
+  h += groupGap();
+  h += irow('','任务完成后','收尾动作：回到运行前的应用 / 关闭抖音 / 留在抖音', afterRunLabel(), 'pickAfterRun()') +
+    trow('运行期间静音','开跑前把媒体/铃声/通知音量降到 0，跑完恢复原音量', S.muteOn, 'S.muteOn=!S.muteOn;render()');
   h += '</div>';
 
   // 数据与工具
@@ -947,7 +967,7 @@ function settings(){
   // 关于
   h += secHead('关于', '');
   h += '<div class="card" style="padding-top:6px;padding-bottom:6px">' +
-    irow('info', '版本', '', 'v3.4.7（34700）') +
+    irow('info', '版本', '', 'v3.4.8（34800）') +
     irow('info', '许可与来源', '', 'Apache-2.0', "openText('许可与来源','Apache License 2.0 · 部分交互表情名与协议来自 yfishyon/doumcp（Apache-2.0）。')") +
     irow('link', '源码', '', 'GitHub', "toast('浏览器里打开仓库')") +
     irow('book', '使用文档', '', '查看', "go('docs')") +
@@ -956,6 +976,24 @@ function settings(){
   return h;
 }
 
+function afterRunLabel(){ return S.afterRun==='kill' ? '关闭抖音' : S.afterRun==='keep' ? '留在抖音' : '回到原应用'; }
+function pickAfterRun(){
+  var a=[['restore','回到运行前的应用','运行前在哪个 App，跑完就切回哪个；运行前息屏则只关抖音、不点亮'],
+         ['kill','关闭抖音','跑完只把抖音关掉，停在桌面'],
+         ['keep','留在抖音','跑完不动，抖音留在前台']];
+  var rows=a.map(function(x){
+    var on=S.afterRun===x[0];
+    return '<div class="iconrow" onclick="setAfterRun(\''+x[0]+'\')" style="cursor:pointer">'+
+      '<div class="mid"><div class="tt">'+x[1]+'</div><div class="st">'+x[2]+'</div></div>'+
+      '<span class="tag '+(on?'done':'')+'">'+(on?'已选':'选择')+'</span></div>';
+  }).join('');
+  showSheet('任务完成后', rows, '');
+}
+function setAfterRun(k){ S.afterRun=k; closeSheet(); render(); }
+function pickRetryStart(){ var v=prompt('开始补发时间（0-23 点；留空=不限，到点就补）', S.retryStart>=0?S.retryStart:22); if(v===null)return; v=(''+v).trim(); if(v===''){ S.retryStart=-1; } else { var n=parseInt(v,10); if(!isNaN(n)){ S.retryStart=Math.max(0,Math.min(23,n)); } } render(); }
+function editNum(t, cur, lo, hi, cb){ var v=parseInt(prompt(t, cur),10); if(!isNaN(v)){ v=Math.max(lo, Math.min(hi, v)); cb(v); } }
+
+function groupGap(){ return '<div style="height:10px"></div>'; }
 function secHead(t, tip){
   return '<div class="sec"><div class="sublabel">' + t + '</div>' +
     (tip ? '<span class="q" title="' + tip.replace(/"/g, '&quot;') + '">?</span>' : '') + '</div>';
@@ -965,7 +1003,7 @@ function docs(){ return ''; }
 
 function irow(g, t, s, v, fn){
   return '<div class="iconrow" ' + (fn ? 'onclick="' + fn + '"' : 'style="cursor:default"') + '>' +
-    '<span class="ic gi">' + IC[g] + '</span><div class="mid"><div class="tt">' + t + '</div>' +
+    (g ? '<span class="ic gi">' + IC[g] + '</span>' : '') + '<div class="mid"><div class="tt">' + t + '</div>' +
     (s ? '<div class="st">' + s + '</div>' : '') + '</div>' +
     (v ? '<span class="val">' + v + '</span>' : '') + (fn ? '<span class="ic ch">' + IC.chev + '</span>' : '') + '</div>';
 }
@@ -1005,7 +1043,7 @@ function renderDrawer(){
   const items = [['home','fire','状态看板',PENDING().length],['templates','tpl','模板',S.tpls.length],
 ['settings','gear','设置',0]];
   $('drawer').innerHTML =
-    '<div class="head"><b>抖音续火花cc</b><span>v3.4.7（34700）· 装于 11-27 22:14</span></div>' +
+    '<div class="head"><b>抖音续火花cc</b><span>v3.4.8（34800）· 装于 11-27 22:14</span></div>' +
     '<div class="dnav">' + items.map(it =>
       '<a class="' + (S.page === it[0] ? 'on' : '') + '" onclick="go(\'' + it[0] + '\')">' +
       '<span class="ic">' + IC[it[1]] + '</span>' + it[2] +

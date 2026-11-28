@@ -93,6 +93,7 @@ class SparkActivity : Activity(), Shell {
         state.reload()
         // 精确闹钟是一次性的，且 force-stop 后 pending alarm 会丢：
         // 每次启动都按当前配置重排一次，hour<0 时 schedule 内部会 cancel。
+        runCatching { com.tiantong.spark.app.alarm.VolumeGuard.restore(this) } // 崩溃 / 被杀后兜底还原音量
         DailyAlarm.schedule(this, state.config.alarmHour, state.config.alarmMinute)
         renderDrawer()
         go(Page.HOME)

@@ -67,6 +67,29 @@ internal object RootShell {
         return remain == 0
     }
 
+    /** 当前前台应用的包名（运行前记录，用于任务后 restore 回到原应用）。取不到返回 null。 */
+    fun foregroundPackage(): String? {
+        if (!hasRoot()) return null
+        val out =
+            exec("/system/bin/dumpsys activity activities | grep -E 'topResumedActivity|mResumedActivity'")
+                ?: return null
+        return Regex("([A-Za-z0-9_.]+)/[A-Za-z0-9_.]+").find(out)?.groupValues?.getOrNull(1)
+    }
+
+    /** 屏幕是否亮着（运行前若不是亮屏，跑完就不去点亮别的应用）。取不到按亮屏处理。 */
+    fun screenAwake(): Boolean {
+        if (!hasRoot()) return true
+        val out = exec("/system/bin/dumpsys power | grep -E 'mWakefulness='") ?: return true
+        return out.contains("Awake")
+    }
+
+    /** 把某个包拉到前台（restore 用）。成功返回 true。 */
+    fun launchPackage(pkg: String): Boolean {
+        if (!hasRoot()) return false
+        val out = exec("/system/bin/monkey -p $pkg -c android.intent.category.LAUNCHER 1") ?: return false
+        return out.contains("Events injected")
+    }
+
     /** 宿主（抖音）私有目录的绝对路径。 */
     const val HOST_FILES_DIR = "/data/data/com.ss.android.ugc.aweme/files"
 

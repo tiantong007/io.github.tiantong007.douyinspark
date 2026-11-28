@@ -65,7 +65,7 @@ class SettingsScreen(private val shell: Shell) : PageView {
         root.addView(settingsHero())
 
         // 续火花
-        root.addView(secHead("续火花", "打开后在抖音进程里自动检查并发送；关掉只能手动发。"))
+        root.addView(secHead("续火花", "自动续火花、任务收尾、补发、定时唤醒都集中在这里；关掉「自动续火花」只能手动发。"))
         root.addView(
             ctx.card(8).apply {
                 addView(
@@ -73,19 +73,7 @@ class SettingsScreen(private val shell: Shell) : PageView {
                         shell.state.update { it.copy(enabled = on) }
                     },
                 )
-                addView(ctx.divider())
-                addView(
-                    ctx.toggleRow("只在设定时间检查", "关掉就是每次打开抖音都检查一遍", config.checkAtAlarmOnly) { on ->
-                        shell.state.update { it.copy(checkAtAlarmOnly = on) }
-                    },
-                )
-            },
-        )
-
-        // 定时唤醒
-        root.addView(secHead("定时唤醒", "优先免 root 拉起抖音（preload provider），失败回退 root + monkey；发完 force-stop。"))
-        root.addView(
-            ctx.card(8).apply {
+                addView(groupGap())
                 addView(
                     ctx.toggleRow("定时唤醒", "开启后到点自动打开抖音，锁屏也能发", config.alarmHour >= 0) { on ->
                         if (on) {
@@ -101,8 +89,14 @@ class SettingsScreen(private val shell: Shell) : PageView {
                         if (on) showAlarmPerm()
                     },
                 )
-                addView(ctx.divider())
                 if (config.alarmHour >= 0) {
+                    addView(ctx.divider())
+                    addView(
+                        ctx.toggleRow("只在设定时间检查", "关掉就是每次打开抖音都检查一遍", config.checkAtAlarmOnly) { on ->
+                            shell.state.update { it.copy(checkAtAlarmOnly = on) }
+                        },
+                    )
+                    addView(ctx.divider())
                     addView(
                         ctx.settingRow(
                             Tokens.Icon.REFRESH, "唤醒时间", "每天这个时间自动叫醒抖音",
@@ -129,13 +123,62 @@ class SettingsScreen(private val shell: Shell) : PageView {
                             Tokens.Icon.BOOK, "唤醒日志", wakeSummary(), "查看", onClick = { showWakeLog() },
                         ),
                     )
-                } else {
+                }
+                addView(groupGap())
+                addView(
+                    ctx.toggleRow("待燃补发", "对今天还没点亮的会话隔一段再发同一条，直到点亮或用完轮数", config.retryEnabled) { on ->
+                        shell.state.update { it.copy(retryEnabled = on, retryPending = false, retryRound = 0) }
+                        shell.rebuild()
+                    },
+                )
+                if (config.retryEnabled) {
+                    addView(ctx.divider())
                     addView(
                         ctx.settingRow(
-                            Tokens.Icon.SHIELD, "已关闭", "开启后才会到点唤醒；可设置时间、查看唤醒日志",
+                            Tokens.Icon.REFRESH, "开始补发时间", "从几点起允许补发；之前不补",
+                            if (config.retryStartHour >= 0) formatTime(config.retryStartHour, config.retryStartMinute) else "不限（到点就补）",
+                            onClick = { pickRetryTime() },
+                        ),
+                    )
+                    addView(ctx.divider())
+                    addView(
+                        ctx.settingRow(
+                            Tokens.Icon.REFRESH, "每次发几条", "同一个会话一次连发几条相同文案",
+                            "${config.retryRepeatCount} 条",
+                            onClick = { editInt("每次发几条", config.retryRepeatCount, 1, 20) { v -> shell.state.update { it.copy(retryRepeatCount = v) } } },
+                        ),
+                    )
+                    addView(ctx.divider())
+                    addView(
+                        ctx.settingRow(
+                            Tokens.Icon.REFRESH, "补发间隔", "两轮之间隔几分钟（系统最小约 15 分钟）",
+                            "${config.retryIntervalMin} 分钟",
+                            onClick = { editInt("补发间隔（分钟）", config.retryIntervalMin, 1, 1440) { v -> shell.state.update { it.copy(retryIntervalMin = v) } } },
+                        ),
+                    )
+                    addView(ctx.divider())
+                    addView(
+                        ctx.settingRow(
+                            Tokens.Icon.REFRESH, "最多补发轮数", "每天最多补发几轮，用完就停",
+                            "${config.retryMaxRounds} 轮",
+                            onClick = { editInt("最多补发轮数", config.retryMaxRounds, 0, 20) { v -> shell.state.update { it.copy(retryMaxRounds = v) } } },
                         ),
                     )
                 }
+                addView(groupGap())
+                addView(
+                    ctx.settingRow(
+                        "", "任务完成后",
+                        "收尾动作：回到运行前的应用 / 关闭抖音 / 留在抖音",
+                        afterRunLabel(config.afterRunAction), onClick = { showAfterRunDialog() },
+                    ),
+                )
+                addView(ctx.divider())
+                addView(
+                    ctx.toggleRow("运行期间静音", "开跑前把媒体/铃声/通知音量降到 0，跑完恢复原音量", config.muteDuringRun) { on ->
+                        shell.state.update { it.copy(muteDuringRun = on) }
+                    },
+                )
             },
         )
 
@@ -237,12 +280,15 @@ class SettingsScreen(private val shell: Shell) : PageView {
         }
 
     /** 分组标题（带可选「?」说明）。 */
+    private fun groupGap(): View =
+        View(ctx).apply { layoutParams = ctx.lp(MATCH, ctx.dp(10)) }
+
     private fun secHead(title: String, tip: String = ""): View =
         ctx.row().apply {
             gravity = Gravity.CENTER_VERTICAL
             layoutParams = ctx.lp(MATCH, WRAP, top = 18, bottom = 8)
             setPadding(ctx.dp(4), 0, ctx.dp(4), 0)
-            addView(ctx.text(title, Tokens.T_SECTION, Tokens.INK_DIM, bold = true), ctx.lp(0, WRAP, 1f))
+            addView(ctx.text(title, 14.5f, Tokens.INK, bold = true), ctx.lp(0, WRAP, 1f))
             if (tip.isNotBlank()) {
                 addView(
                     ctx.text("?", 11f, Tokens.INK_FAINT, bold = true).apply {
@@ -282,6 +328,78 @@ class SettingsScreen(private val shell: Shell) : PageView {
                 true,
             ).show()
         }
+    }
+
+    private fun afterRunLabel(action: String): String = when (action) {
+        "kill" -> "关闭抖音"
+        "keep" -> "留在抖音"
+        else -> "回到原应用"
+    }
+
+    private fun showAfterRunDialog() {
+        val labels = arrayOf(
+            "回到运行前的应用（推荐）\n运行前在哪个 App，跑完就切回哪个；运行前息屏则只关抖音、不点亮",
+            "关闭抖音\n跑完只把抖音关掉，停在桌面",
+            "留在抖音\n跑完不动，抖音留在前台",
+        )
+        val keys = arrayOf("restore", "kill", "keep")
+        val cur = keys.indexOf(shell.state.config.afterRunAction).coerceAtLeast(0)
+        android.app.AlertDialog.Builder(ctx)
+            .setTitle("任务完成后")
+            .setSingleChoiceItems(labels, cur) { dialog, which ->
+                shell.state.update { it.copy(afterRunAction = keys[which]) }
+                dialog.dismiss()
+                shell.rebuild()
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun pickRetryTime() {
+        val c = shell.state.config
+        val h = if (c.retryStartHour < 0) 22 else c.retryStartHour
+        val m = if (c.retryStartHour < 0) 0 else c.retryStartMinute
+        runCatching {
+            val dialog = TimePickerDialog(
+                shell.activity,
+                { _, hh, mm ->
+                    shell.state.update { it.copy(retryStartHour = hh, retryStartMinute = mm) }
+                    shell.rebuild()
+                    ctx.tip("从 ${formatTime(hh, mm)} 起补发")
+                },
+                h,
+                m,
+                true,
+            )
+            // 「不限」：不设起始时刻，一到点就允许补发
+            dialog.setButton(android.content.DialogInterface.BUTTON_NEUTRAL, "不限") { _, _ ->
+                shell.state.update { it.copy(retryStartHour = -1) }
+                shell.rebuild()
+                ctx.tip("不限起始时间，到点就补")
+            }
+            dialog.show()
+        }
+    }
+
+    private fun editInt(title: String, cur: Int, lo: Int, hi: Int, onSet: (Int) -> Unit) {
+        val input =
+            android.widget.EditText(ctx).apply {
+                setText(cur.toString())
+                inputType = android.text.InputType.TYPE_CLASS_NUMBER
+                setSelection(text.length)
+            }
+        android.app.AlertDialog.Builder(ctx)
+            .setTitle(title)
+            .setView(input)
+            .setPositiveButton("保存") { _, _ ->
+                val v = input.text.toString().toIntOrNull()?.coerceIn(lo, hi)
+                if (v != null) {
+                    onSet(v)
+                    shell.rebuild()
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     // ── 定时唤醒：权限检测与唤醒日志 ─────────────────────────────────

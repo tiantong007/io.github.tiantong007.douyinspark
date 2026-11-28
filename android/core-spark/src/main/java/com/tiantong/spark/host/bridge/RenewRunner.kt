@@ -122,6 +122,7 @@ fun runRenew(
     respectEnabled: Boolean,
     only: Set<String> = emptySet(),
     ignoreSentToday: Boolean = false,
+    repeatCount: Int = 1,
 ): JSONObject {
     // 同一时刻只允许一轮：否则「启动补跑 + 前台补跑」会各发一次。
     // 抢不到时不直接报错——手动发送撞上自动任务时，用户只会看到「上一轮还在发送」
@@ -132,7 +133,7 @@ fun runRenew(
         runCatching { Thread.sleep(QUEUE_POLL_MS) }
     }
     return try {
-        runRenewLocked(context, respectEnabled, only, ignoreSentToday)
+        runRenewLocked(context, respectEnabled, only, ignoreSentToday, repeatCount)
     } finally {
         renewRunning.set(false)
     }
@@ -143,6 +144,7 @@ internal fun runRenewLocked(
     respectEnabled: Boolean,
     only: Set<String> = emptySet(),
     ignoreSentToday: Boolean = false,
+    repeatCount: Int = 1,
 ): JSONObject {
     val config = ConfigClient.read(context) ?: return error("配置读取失败（模块未安装或未启用）")
     if (respectEnabled && !config.enabled) return error("总开关未开启")
@@ -294,6 +296,8 @@ internal fun runRenewLocked(
         var allOk = true
         var firstReason = ""
         var lastMsgId = 0L
+        // 补发轮会要求「同一会话一次连发几条相同文案」，这里按段整组重复
+        repeat(repeatCount.coerceAtLeast(1)) {
         segments.forEach { seg ->
             val ok: Boolean
             val errorText: String
@@ -332,6 +336,7 @@ internal fun runRenewLocked(
                 allOk = false
                 if (firstReason.isEmpty()) firstReason = errorText
             }
+        }
         }
         val success = allOk && sentAny
         val reason = if (success) "" else firstReason.ifBlank { "发送失败" }

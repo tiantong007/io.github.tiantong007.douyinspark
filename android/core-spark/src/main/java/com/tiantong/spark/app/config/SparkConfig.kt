@@ -60,6 +60,27 @@ data class SparkConfig(
      * 没设闹钟时间时该开关不生效（否则会永远不检查）。
      */
     val checkAtAlarmOnly: Boolean = true,
+    /** 任务跑完后的收尾：restore=回到运行前的应用 / kill=关闭抖音 / keep=保持不动。 */
+    val afterRunAction: String = "restore",
+    /** 运行期间把媒体 / 铃声 / 通知音量降到 0，跑完恢复原音量。 */
+    val muteDuringRun: Boolean = true,
+    /** 待燃补发：对今天还没点亮的会话隔一段再发同一条（默认关）。 */
+    val retryEnabled: Boolean = false,
+    /** 补发从几点开始（-1 = 不限，主发送后即可补）。 */
+    val retryStartHour: Int = 22,
+    val retryStartMinute: Int = 0,
+    /** 同一会话一次连发几条相同文案。 */
+    val retryRepeatCount: Int = 1,
+    /** 两轮补发之间隔多少分钟。 */
+    val retryIntervalMin: Int = 15,
+    /** 每天最多补发几轮（0 = 不补）。 */
+    val retryMaxRounds: Int = 3,
+    /** 已补发轮数（内部记账，换天清零）。 */
+    val retryRound: Int = 0,
+    /** 是否有一次「补发轮」正等着抖音被拉起来执行（内部，一次性）。 */
+    val retryPending: Boolean = false,
+    /** 补发轮数记账对应的日期（内部，换天归零）。 */
+    val retryDay: String = "",
 ) {
     fun group(id: String?): TemplateGroup? = groups.firstOrNull { it.id == id }
 
