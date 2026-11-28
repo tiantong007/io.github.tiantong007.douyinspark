@@ -59,6 +59,7 @@ class AlarmReceiver : BroadcastReceiver() {
         // 后面的判据是「它变大了」= 本轮真的跑完，而不是「内容等于今天」（早就是今天了）。
         val baseline = RootShell.modifiedAt(DAY_FILE)
         val method = DailyAlarm.launchDouyin(app)
+        WakeLog.record(app, method)
         Log.i(TAG, "闹钟触发：拉起抖音 $method，基线 mtime=$baseline，开始等发送完成")
         if (method == DailyAlarm.LaunchMethod.FAILED) return
         watchAndClose(baseline)

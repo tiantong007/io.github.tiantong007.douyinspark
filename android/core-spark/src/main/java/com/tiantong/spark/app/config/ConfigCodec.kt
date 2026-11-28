@@ -22,6 +22,7 @@ object ConfigCodec {
     private const val KEY_HOST_NOTE = "hostNote"
     private const val KEY_HOST_NOTE_AT = "hostNoteAt"
     private const val KEY_HOST_ALIVE_AT = "hostAliveAt"
+    private const val KEY_WAKE_LOG = "wakeLog"
     private const val KEY_GUIDE_DISMISSED = "guideDismissed"
     private const val KEY_GUIDE_SEARCHED = "guideSearched"
     private const val KEY_GUIDE_SHARED = "guideShared"
@@ -157,6 +158,7 @@ object ConfigCodec {
             .put(KEY_HOST_NOTE, config.hostNote)
             .put(KEY_HOST_NOTE_AT, config.hostNoteAt)
             .put(KEY_HOST_ALIVE_AT, config.hostAliveAt)
+            .put(KEY_WAKE_LOG, config.wakeLog)
             .put(KEY_GUIDE_DISMISSED, config.guideDismissed)
             .put(KEY_GUIDE_SEARCHED, config.guideSearched)
             .put(KEY_GUIDE_SHARED, config.guideShared)
@@ -304,6 +306,7 @@ object ConfigCodec {
             hostNote = root.optString(KEY_HOST_NOTE),
             hostNoteAt = root.optLong(KEY_HOST_NOTE_AT),
             hostAliveAt = root.optLong(KEY_HOST_ALIVE_AT),
+            wakeLog = root.optString(KEY_WAKE_LOG),
             guideDismissed = root.optBoolean(KEY_GUIDE_DISMISSED),
             guideSearched = root.optBoolean(KEY_GUIDE_SEARCHED),
             guideShared = root.optBoolean(KEY_GUIDE_SHARED),

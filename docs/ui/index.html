@@ -62,6 +62,7 @@ background:radial-gradient(circle,rgba(254,44,85,.55),rgba(254,44,85,0) 70%)}
 .row:last-child{border-bottom:0}
 .av{width:42px;height:42px;border-radius:50%;flex:0 0 42px;object-fit:cover;background:#DDE0E6;
 display:grid;place-items:center;color:#fff;font-weight:650;font-size:16px;overflow:hidden}
+.av.plain{background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='8.4' r='4' fill='%23ffffff' fill-opacity='.96'/><path d='M4.4 19.8c0-3.95 3.6-6.15 7.6-6.15s7.6 2.2 7.6 6.15' fill='%23ffffff' fill-opacity='.96'/></svg>") center/22px 22px no-repeat,linear-gradient(140deg,#8CC2FF 0%,#6F9BFF 52%,#5A7BFF 100%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.28),inset 0 -7px 12px rgba(20,40,90,.10)}
 .who{flex:1;min-width:0}
 .who .n{font-size:14.5px;font-weight:600;display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden}
 .who .n .nm{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
@@ -347,12 +348,12 @@ font-size:13px;padding:10px 16px;border-radius:12px;opacity:0;transition:.2s;z-i
 
 抖音「自动续火花」LSPosed 模块。给抖音判定今天还没互动的会话，自动发一条你自己写的私信，每会话每天最多一条。
 
-<!-- version-anchor: v3.4.5 (34500) -->
-**v3.4.5**（versionCode 34500）· Android 9+ / Root / LSPosed 2.x · arm64-v8a
+<!-- version-anchor: v3.4.6 (34600) -->
+**v3.4.6**（versionCode 34600）· Android 9+ / Root / LSPosed 2.x · arm64-v8a
 
 ## 界面预览
 
-<img src="docs/ui/screenshot.png" alt="状态看板：三个大数字（自动发送 / 已续 / 已燃）+ 两行分段 + 会话列表" width="360">
+<img src="docs/ui/screenshot.png" alt="状态看板：顶部概览（自动发送 / 已续 / 已燃）+ 五档分段 + 好友 / 群聊分栏会话列表" width="360">
 
 以上是从原型截的**状态看板**：左「自动发送」、中「已续」、右「已燃」三个大数字，下面是名单构成与「下一轮」时间；再往下是两行分段（火花五档 / 发送名单两档）和会话列表——第一行名字 + 🔥火花天数，第二行「默认 / 固定发送 / 固定不发」三态徽章 + 状态徽章，行尾是勾选开关。
 
@@ -392,11 +393,11 @@ font-size:13px;padding:10px 16px;border-radius:12px;opacity:0;transition:.2s;z-i
 
 **自动发送名单**：只回答「总开关开着、今天该续的时候，谁会被自动续」，跟今天续没续过**完全无关**。有火花就默认在名单里（已燃只是今天续过了，明天照样续）；固定发送让没火花的也每天发；固定不发永远不自动续，点「恢复默认」放回抖音判定。名单里没文案的人排在最前并标「无文案」，自动发送会跳过。手动勾选发送不受名单影响。
 
-**模板**：内置两张 + 我的模板。每张卡底部平铺五个等宽按钮：**编辑 / 预览 / 克隆 / 重命名 / 删除**（删除是浅红，破坏性放最后），不再有「更多」二级菜单。克隆是**多选**：勾一批人一次写完，顶部有「全选 / 清空」和已选计数，已经继承这个模板的会预勾上并标「已继承」；主按钮跟着勾选数变，一个没勾时压暗成「先勾几个会话」。
+**模板**：内置两张 + 我的模板。每张卡底部平铺五个等宽按钮：**编辑 / 预览 / 克隆 / 重命名 / 删除**（删除是浅红，破坏性放最后），不再有「更多」二级菜单。克隆是**多选**：勾一批人一次写完，顶部按火花状态分**七档**（全部 / 已燃 / 重燃中 / 待燃 / 待续 / 可点亮 / 无火花）筛选，并有「全选 / 清空」和已选计数，已经继承这个模板的会预勾上并标「已继承」；主按钮跟着勾选数变，一个没勾时压暗成「先勾几个会话」。
 
 **变量**：不再单独占一页。变量是**模板配置**——模板里写 `<名字>` + `<表达式>`，脚本里用 `${ctx.template.vars["名字"]}` 取；编辑器里的「变量」按钮只负责把路径插进光标处，内置路径都是 `ctx.builtin.*` / `ctx.io.*`，会话层同名覆盖模板层。
 
-**设置**：发送（总开关 / 只在设定时间检查）、定时唤醒（选时间 / 关闭）、诊断（运行日志 / 安装包自校验）、关于。
+**设置**：续火花（自动续火花 / 只在设定时间检查）、定时唤醒（开关 / 唤醒时间 / 权限检查 / 调度兜底 / 唤醒日志）、数据与工具（运行日志 / 系统诊断）、关于（版本 / 许可与来源 / 源码 / 使用文档）。顶部有概览卡（自动续火花状态 · 每天几点唤醒 · 调度兜底 · 只在设定时间）。
 
 **编辑弹层**：会话模式底部四个按钮——模板 / 表情 / 变量 / 预览（模板模式没有「模板」按钮）。表情点开是 21 个表情的网格，内容空就插整句、非空就插片段。保存时自动清掉零宽字符和中文引号。
 
@@ -512,6 +513,16 @@ const GROUP = [
   {k:'待燃',  f:r => r.s && (r.x === 2 || r.x === 3)},
   {k:'待续',  f:r => r.rn && !r.s},
   {k:'无火花', f:r => r.x === -1},
+];
+// 克隆弹层七档分组：全部 + 已燃/重燃中/待燃/待续/可点亮/无火花
+const CLONE_G = [
+  {k:'全部',   f:() => true},
+  {k:'已燃',   f:r => r.hs && r.x === 1},
+  {k:'重燃中', f:r => r.hs && r.x === 3},
+  {k:'待燃',   f:r => r.hs && r.x === 2 && r.s},
+  {k:'待续',   f:r => r.hs && r.x === 2 && !r.s},
+  {k:'可点亮', f:r => !r.hs && r.st === '可点亮'},
+  {k:'无火花', f:r => !r.hs && r.st !== '可点亮'},
 ];
 const matches = r => S.mstat === 0 ? inList(r) : S.mstat === 1 ? !inList(r)
   : (GROUP[S.filter] ? GROUP[S.filter].f(r) : true);
@@ -656,7 +667,7 @@ function row(r, o){
   const dtag = ms === 'in' ? '<span class="tag in">固定发送</span>'
     : ms === 'out' ? '<span class="tag skip">固定不发</span>'
     : '<span class="tag def">默认</span>';
-  const av = r.av ? '<img class="av" src="' + r.av + '">' : '<div class="av">' + (r.n||'?').slice(0,1) + '</div>';
+  const av = '<div class="av plain"></div>';
   const hit = o.click || ("openEditor('" + r.id + "')");
   return '<div class="row" onclick="' + hit + '">' + av +
     '<div class="who"><div class="n"><span class="nm">' + r.n + '</span>' +
@@ -689,9 +700,9 @@ function cloneTpl(i){
   CLONE = { i: i, filter: 0, sel: new Set(D.rows.filter(r => r.tpl === i).map(r => r.id)) };
   drawClone();
 }
-// 分组与状态看板共用同一张 GROUP 表：全部 / 已燃 / 待燃 / 待续 / 无火花
+// 克隆分组：七档（全部 + 已燃/重燃中/待燃/待续/可点亮/无火花）
 function cloneSet(){
-  const g = GROUP[CLONE.filter];
+  const g = CLONE_G[CLONE.filter];
   return D.rows.filter(g ? g.f : true);
 }
 function cloneFilter(i){ CLONE.filter = i; drawClone(); }
@@ -706,7 +717,7 @@ function drawClone(){
     sub: r.tpl === CLONE.i ? '<span class="tag def">已继承</span>' : null,
     chk: { on: CLONE.sel.has(r.id), click: "tglClone('" + r.id + "')" }
   })).join('');
-  const seg = GROUP.map((g, i) => '<button class="' + (CLONE.filter === i ? 'on' : '') + '" onclick="cloneFilter(' + i + ')">' +
+  const seg = CLONE_G.map((g, i) => '<button class="' + (CLONE.filter === i ? 'on' : '') + '" onclick="cloneFilter(' + i + ')">' +
     g.k + ' ' + D.rows.filter(g.f).length + '</button>').join('');
   showSheet('克隆「' + t.n + '」到…',
     '<div class="segmented">' + seg + '</div>' +
@@ -935,7 +946,7 @@ function settings(){
   // 关于
   h += secHead('关于', '');
   h += '<div class="card" style="padding-top:6px;padding-bottom:6px">' +
-    irow('info', '版本', '', 'v3.4.5（34500）') +
+    irow('info', '版本', '', 'v3.4.6（34600）') +
     irow('info', '许可与来源', '', 'Apache-2.0', "openText('许可与来源','Apache License 2.0 · 部分交互表情名与协议来自 yfishyon/doumcp（Apache-2.0）。')") +
     irow('link', '源码', '', 'GitHub', "toast('浏览器里打开仓库')") +
     irow('book', '使用文档', '', '查看', "go('docs')") +
@@ -993,7 +1004,7 @@ function renderDrawer(){
   const items = [['home','fire','状态看板',PENDING().length],['templates','tpl','模板',S.tpls.length],
 ['settings','gear','设置',0]];
   $('drawer').innerHTML =
-    '<div class="head"><b>抖音续火花cc</b><span>v3.4.5（34500）· 装于 11-27 22:14</span></div>' +
+    '<div class="head"><b>抖音续火花cc</b><span>v3.4.6（34600）· 装于 11-27 22:14</span></div>' +
     '<div class="dnav">' + items.map(it =>
       '<a class="' + (S.page === it[0] ? 'on' : '') + '" onclick="go(\'' + it[0] + '\')">' +
       '<span class="ic">' + IC[it[1]] + '</span>' + it[2] +
@@ -1291,16 +1302,9 @@ function openLog(){
       ? '<div class="loglist">' + ordered.map(logRow).join('') + '</div>'
       : (all.length
           ? '<div class="logempty">这一类暂时没有记录。</div>'
-          : '<div class="logempty">宿主还没回写过东西。进一次抖音，再回来点刷新。</div>')),
-    '<button class="mini" style="width:100%;padding:12px" onclick="copyLog()">复制全文</button>');
+          : '<div class="logempty">宿主还没回写过东西。进一次抖音，再回来点刷新。</div>')));
 }
 
-function copyLog(){
-  try {
-    navigator.clipboard.writeText(NOTE_FULL);
-    toast('日志已复制');
-  } catch (e) { toast('复制失败，长按选择文字'); }
-}
 
 function cntEd(ta){
   const c = document.getElementById('cnt');
@@ -1554,18 +1558,6 @@ function pickTime(){
     ['22:30','function(){S.alarm=[22,30];render();toast(\'已设为 22:30\')}']]);
 }
 
-function copyDoc(){
-  const el = document.querySelector('.doc');
-  if (!el) return;
-  try { navigator.clipboard.writeText(el.innerText); toast('已复制全文'); }
-  catch (e) { toast('复制失败，长按选择文字'); }
-}
-function shareDoc(){
-  const el = document.querySelector('.doc');
-  const text = el ? el.innerText : '';
-  if (navigator.share) { navigator.share({title:'抖音续火花cc · 使用说明', text: text}).catch(function(){}); }
-  else { toast('这个环境不支持系统分享'); }
-}
 // 粘贴清理：零宽字符、花引号、Markdown 围栏（与真机 normalize 一致）
 function cleanPaste(ev){
   const dt = ev.clipboardData || window.clipboardData;
@@ -1583,9 +1575,6 @@ function docsPage(){
   const mdEl = document.getElementById('manualMd');
   const md = mdEl ? mdEl.textContent : '';
   return '<div class="doc">' +
-    '<div class="actions" style="margin:0 0 10px">' +
-      '<button class="mini" onclick="copyDoc()">复制全文</button>' +
-      '<button class="mini" onclick="shareDoc()">分享</button></div>' +
     '<div class="hint" style="margin:0 0 12px">真机里这一页是 WebView 渲染安装包内的 <code>assets/docs/manual.md</code>，和仓库 README 是同一份内容 —— 这里直接把同一份 markdown 渲染出来。</div>' +
     '<div class="docbody">' + renderMd(md) + '</div>' +
     '</div>';
@@ -1630,7 +1619,7 @@ document.getElementById('spec').innerHTML = [
   ['胶囊','12sp，pad 8/11，min 28','rgba(255,255,255,.10)，fire 变体粉'],
   ['分段控件','槽 r12 pad3，块 r9','#E7E9EE 槽 + 白块'],
   ['列表行','pad 12/15，gap 12','头像 42 圆，底部 1px 线'],
-  ['头像','42dp','url 缺失时首字 + 灰底'],
+  ['头像','42dp','统一占位头像（蓝色渐变人像）'],
   ['名字','14.5sp / 600','已续时降到 #B9BEC8'],
   ['标签','10.5sp，pad 0/7，h19，r6','已燃绿#12B886 / 待燃·待续橙#F59E0B / 重燃中#B45309 / 可点亮·群蓝#3B82F6 / 无火花灰#A0A5B0'],
   ['天数','15sp / 700 + 「天」10.5',''],

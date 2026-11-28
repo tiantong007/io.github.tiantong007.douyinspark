@@ -33,6 +33,8 @@ data class SparkConfig(
     val hostNoteAt: Long = 0L,
     /** 宿主（抖音进程）最近一次响应指令的时间戳：界面用它判断抖音是否在运行。 */
     val hostAliveAt: Long = 0L,
+    /** 定时唤醒历史：每行 `时间戳|方式`（PRELOAD/MONKEY/FAILED），最多保留最近 30 条。 */
+    val wakeLog: String = "",
     /** 新手引导卡片是否已收起（只影响提示，不影响功能）。 */
     val guideDismissed: Boolean = false,
     /** 引导用：是否用过搜索。 */

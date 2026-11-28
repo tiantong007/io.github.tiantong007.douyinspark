@@ -6,8 +6,10 @@ import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.tiantong.spark.app.ui.v2.comp.chips
+import com.tiantong.spark.app.ui.v2.comp.gradient
 import com.tiantong.spark.app.ui.v2.comp.shape
 import com.tiantong.spark.app.alarm.DailyAlarm
+import com.tiantong.spark.app.alarm.WakeLog
 import com.tiantong.spark.app.ui.v2.comp.MATCH
 import com.tiantong.spark.app.ui.v2.comp.WRAP
 import com.tiantong.spark.app.ui.v2.comp.card
@@ -33,7 +35,7 @@ import com.tiantong.spark.app.ui.v2.comp.divider
 import com.tiantong.spark.app.ui.v2.comp.dpF
 
 /**
- * 设置：开关 + 数据 + 诊断 + 关于，全在这一页。
+ * 设置：顶部概览卡 + 四组（续火花 / 定时唤醒 / 数据与工具 / 关于），与网页原型同版式。
  *
  * 每项都写清楚「改了会发生什么」，不放装饰性选项。
  */
@@ -60,126 +62,119 @@ class SettingsScreen(private val shell: Shell) : PageView {
         root.removeAllViews()
         val config = shell.state.config
 
-        root.addView(ctx.sectionLabel("发送"))
+        root.addView(settingsHero())
+
+        // 续火花
+        root.addView(secHead("续火花", "打开后在抖音进程里自动检查并发送；关掉只能手动发。"))
         root.addView(
             ctx.card(8).apply {
                 addView(
-                    ctx.toggleRow(
-                        "自动续火花",
-                        "打开抖音时自动检查并发送（关掉后只能手动发）",
-                        config.enabled,
-                    ) { on ->
+                    ctx.toggleRow("自动续火花", "打开抖音时自动检查并发送", config.enabled) { on ->
                         shell.state.update { it.copy(enabled = on) }
                     },
                 )
                 addView(ctx.divider())
                 addView(
-                    ctx.toggleRow(
-                        "只在设定时间检查",
-                        "关掉就是每次打开抖音都检查一遍",
-                        config.checkAtAlarmOnly,
-                    ) { on ->
+                    ctx.toggleRow("只在设定时间检查", "关掉就是每次打开抖音都检查一遍", config.checkAtAlarmOnly) { on ->
                         shell.state.update { it.copy(checkAtAlarmOnly = on) }
                     },
                 )
             },
         )
 
-        root.addView(ctx.sectionLabel("定时唤醒"))
+        // 定时唤醒
+        root.addView(secHead("定时唤醒", "优先免 root 拉起抖音（preload provider），失败回退 root + monkey；发完 force-stop。"))
         root.addView(
             ctx.card(8).apply {
                 addView(
-                    ctx.settingRow(
-                        Tokens.Icon.REFRESH,
-                        "每天唤醒抖音",
-                        if (config.alarmHour < 0) "未开启" else "到点自动打开抖音，锁屏也能发",
-                        if (config.alarmHour < 0) "关闭" else formatTime(config.alarmHour, config.alarmMinute),
-                        onClick = { pickTime() },
-                    ),
+                    ctx.toggleRow("定时唤醒", "开启后到点自动打开抖音，锁屏也能发", config.alarmHour >= 0) { on ->
+                        if (on) {
+                            val h = if (config.alarmHour < 0) 8 else config.alarmHour
+                            val m = if (config.alarmHour < 0) 0 else config.alarmMinute
+                            shell.state.update { it.copy(alarmHour = h, alarmMinute = m, alarmAsked = true) }
+                            DailyAlarm.schedule(ctx, h, m)
+                        } else {
+                            shell.state.update { it.copy(alarmHour = -1) }
+                            DailyAlarm.schedule(ctx, -1, 0)
+                        }
+                        shell.rebuild()
+                        if (on) showAlarmPerm()
+                    },
                 )
+                addView(ctx.divider())
                 if (config.alarmHour >= 0) {
+                    addView(
+                        ctx.settingRow(
+                            Tokens.Icon.REFRESH, "唤醒时间", "每天这个时间自动叫醒抖音",
+                            formatTime(config.alarmHour, config.alarmMinute), onClick = { pickTime() },
+                        ),
+                    )
                     addView(ctx.divider())
                     addView(
                         ctx.settingRow(
-                            Tokens.Icon.CLOSE,
-                            "关闭定时唤醒",
-                            "",
-                            "",
-                            color = Tokens.DANGER,
-                            glyphColor = Tokens.DANGER,
-                            onClick = {
-                                shell.state.update { it.copy(alarmHour = -1) }
-                                DailyAlarm.schedule(ctx, -1, 0)
-                                shell.rebuild()
-                            },
+                            Tokens.Icon.SHIELD, "权限检查", alarmPermSummary(), "去开启",
+                            onClick = { showAlarmPerm() },
+                        ),
+                    )
+                    addView(ctx.divider())
+                    addView(
+                        ctx.settingRow(
+                            Tokens.Icon.SHIELD, "调度兜底", "定时唤醒被系统清掉时，每 15 分钟自动补排一次", "正常",
+                            glyphColor = 0xFF35D0A5.toInt(),
+                        ),
+                    )
+                    addView(ctx.divider())
+                    addView(
+                        ctx.settingRow(
+                            Tokens.Icon.BOOK, "唤醒日志", wakeSummary(), "查看", onClick = { showWakeLog() },
+                        ),
+                    )
+                } else {
+                    addView(
+                        ctx.settingRow(
+                            Tokens.Icon.SHIELD, "已关闭", "开启后才会到点唤醒；可设置时间、查看唤醒日志",
                         ),
                     )
                 }
             },
         )
-        root.addView(
-            ctx.note(
-                "定时唤醒优先免 root 拉起抖音（向抖音 preload provider 取 client 触发主进程启动，不需要 su）；" +
-                    "该方式不可达时自动回退 root + monkey。模块本身只在抖音进程里运行，抖音不启动就没有代码在跑。",
-                Tokens.WARN,
-                Tokens.WARN_SOFT,
-            ),
-        )
-        root.addView(
-            ctx.row().apply {
-                gravity = Gravity.END
-                addView(
-                    ctx.text("详细说明 →", Tokens.T_SUB, Tokens.ACCENT, bold = true).apply {
-                        setPadding(ctx.dp(8), ctx.dp(8), ctx.dp(4), ctx.dp(8))
-                        isClickable = true
-                        setOnClickListener { shell.go(Page.HOME) }
-                    },
-                    ctx.lp(WRAP, WRAP),
-                )
-            },
-            ctx.lp(MATCH, WRAP),
-        )
 
-        root.addView(ctx.sectionLabel("诊断"))
+        // 数据与工具
+        root.addView(secHead("数据与工具"))
         root.addView(
             ctx.card(8).apply {
                 addView(
                     ctx.settingRow(
-                        Tokens.Icon.BOOK, "运行日志",
-                        "抖音进程最近写下的话", "查看",
+                        Tokens.Icon.BOOK, "运行日志", "抖音进程最近写下的话", "查看",
                         onClick = { showHostLog() },
                     ),
                 )
                 addView(ctx.divider())
                 addView(
                     ctx.settingRow(
-                        Tokens.Icon.SHIELD, "安装包自校验",
-                        "签名证书与资源指纹", "查看",
+                        Tokens.Icon.SHIELD, "系统诊断", "安装包自校验", "正常",
                         onClick = { showSelfCheck() },
                     ),
                 )
             },
         )
 
-        root.addView(ctx.sectionLabel("关于"))
+        // 关于
+        root.addView(secHead("关于"))
         root.addView(
             ctx.card(8).apply {
-                addView(
-                    ctx.settingRow(Tokens.Icon.INFO, "版本", "", versionText()),
-                )
+                addView(ctx.settingRow(Tokens.Icon.INFO, "版本", "", versionText()))
                 addView(ctx.divider())
                 addView(
                     ctx.settingRow(
-                        Tokens.Icon.BOOK, "许可与来源",
-                        "Apache-2.0", "查看",
+                        Tokens.Icon.BOOK, "许可与来源", "Apache-2.0", "查看",
                         onClick = { showLicense() },
                     ),
                 )
                 addView(ctx.divider())
                 addView(
                     ctx.settingRow(
-                        Tokens.Icon.LINK, "源码",
-                        "github.com/tiantong007", "",
+                        Tokens.Icon.LINK, "源码", "github.com/tiantong007", "",
                         onClick = {
                             runCatching {
                                 ctx.startActivity(
@@ -192,10 +187,78 @@ class SettingsScreen(private val shell: Shell) : PageView {
                         },
                     ),
                 )
+                addView(ctx.divider())
+                addView(
+                    ctx.settingRow(Tokens.Icon.BOOK, "使用文档", "", "查看", onClick = { shell.go(Page.DOCS) }),
+                )
             },
         )
 
         root.addView(android.view.View(ctx), ctx.lp(MATCH, 28))
+    }
+
+    /** 设置页顶部深色概览卡：自动续火花状态 + 每天几点唤醒 + 调度兜底 + 只在设定时间。 */
+    private fun settingsHero(): View {
+        val config = shell.state.config
+        val on = config.enabled
+        val alarmOn = config.alarmHour >= 0
+        val tstr = if (alarmOn) formatTime(config.alarmHour, config.alarmMinute) else "—"
+        val frame = android.widget.FrameLayout(ctx).apply {
+            background = ctx.gradient(Tokens.HERO_START, Tokens.HERO_END, Tokens.R_XL)
+            layoutParams = ctx.lp(MATCH, WRAP, top = 10, bottom = 4)
+        }
+        val body = ctx.column().apply { setPadding(ctx.dp(18), ctx.dp(14), ctx.dp(18), ctx.dp(15)) }
+        frame.addView(body, android.widget.FrameLayout.LayoutParams(MATCH, WRAP))
+        body.addView(
+            ctx.row().apply {
+                gravity = Gravity.CENTER_VERTICAL
+                addView(
+                    View(ctx).apply { background = ctx.shape(if (on) 0xFF35D0A5.toInt() else 0xFF8A8F98.toInt(), 5) },
+                    ctx.lp(5, 5, right = 7),
+                )
+                addView(ctx.text("自动续火花 · " + (if (on) "已开启" else "已关闭"), 11.5f, Tokens.ON_HERO_DIM))
+            },
+        )
+        body.addView(
+            ctx.row().apply {
+                addView(hstat(tstr, "每天唤醒"), ctx.lp(0, WRAP, 1f))
+                addView(hstat(if (alarmOn) "正常" else "未启用", "调度兜底"), ctx.lp(0, WRAP, 1f))
+                addView(hstat(if (config.checkAtAlarmOnly) "开" else "关", "只在设定时间"), ctx.lp(0, WRAP, 1f))
+            },
+            ctx.lp(MATCH, WRAP, top = 10),
+        )
+        return frame
+    }
+
+    private fun hstat(value: String, label: String): View =
+        ctx.column().apply {
+            addView(ctx.text(value, 18f, Tokens.ON_HERO, bold = true))
+            addView(ctx.text(label, 10.5f, Tokens.ON_HERO_FAINT), ctx.lp(WRAP, WRAP, top = 2))
+        }
+
+    /** 分组标题（带可选「?」说明）。 */
+    private fun secHead(title: String, tip: String = ""): View =
+        ctx.row().apply {
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = ctx.lp(MATCH, WRAP, top = 18, bottom = 8)
+            setPadding(ctx.dp(4), 0, ctx.dp(4), 0)
+            addView(ctx.text(title, Tokens.T_SECTION, Tokens.INK_DIM, bold = true), ctx.lp(0, WRAP, 1f))
+            if (tip.isNotBlank()) {
+                addView(
+                    ctx.text("?", 11f, Tokens.INK_FAINT, bold = true).apply {
+                        gravity = Gravity.CENTER
+                        background = ctx.shape(Tokens.SEG_BG, 9)
+                        isClickable = true
+                        setOnClickListener { showTip(title, tip) }
+                    },
+                    ctx.lp(18, 18),
+                )
+            }
+        }
+
+    private fun showTip(title: String, tip: String) {
+        android.app.AlertDialog.Builder(ctx).setTitle(title).setMessage(tip)
+            .setPositiveButton("知道了", null).show()
     }
 
     private fun formatTime(hour: Int, minute: Int): String =
@@ -218,6 +281,118 @@ class SettingsScreen(private val shell: Shell) : PageView {
                 minute,
                 true,
             ).show()
+        }
+    }
+
+    // ── 定时唤醒：权限检测与唤醒日志 ─────────────────────────────────
+
+    private fun exactAlarmOk(): Boolean =
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            (ctx.getSystemService(android.content.Context.ALARM_SERVICE) as android.app.AlarmManager).canScheduleExactAlarms()
+        } else {
+            true
+        }
+
+    private fun batteryOk(): Boolean =
+        (ctx.getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager)
+            .isIgnoringBatteryOptimizations(ctx.packageName)
+
+    private fun notifOk(): Boolean =
+        (ctx.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as android.app.NotificationManager)
+            .areNotificationsEnabled()
+
+    private fun alarmPermSummary(): String {
+        val missing = ArrayList<String>()
+        if (!exactAlarmOk()) missing.add("精确闹钟")
+        if (!batteryOk()) missing.add("电池不限制")
+        if (!notifOk()) missing.add("通知")
+        return if (missing.isEmpty()) "已就绪" else "还需：" + missing.joinToString("、")
+    }
+
+    private fun openSys(intent: android.content.Intent) {
+        runCatching { ctx.startActivity(intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+    }
+
+    private fun showAlarmPerm() {
+        val pkg = "package:" + ctx.packageName
+        com.tiantong.spark.app.ui.v2.comp.Sheet.open(shell.activity, "定时唤醒权限") { body ->
+            body.addView(
+                ctx.note(
+                    "为确保到点能唤醒，建议开启下面各项。点右侧「去开启」跳到系统设置，开不开由你自己决定。",
+                    Tokens.WARN,
+                    Tokens.WARN_SOFT,
+                ),
+            )
+            fun rowPrem(title: String, sub: String, ok: Boolean, action: android.content.Intent?) {
+                var click: (() -> Unit)? = null
+                if (!ok && action != null) {
+                    val a = action
+                    click = { openSys(a) }
+                }
+                body.addView(
+                    ctx.settingRow(
+                        if (ok) Tokens.Icon.CHECK else Tokens.Icon.REFRESH,
+                        title,
+                        sub,
+                        if (ok) "已开启" else if (action != null) "去开启" else "按需",
+                        glyphColor = if (ok) 0xFF35D0A5.toInt() else Tokens.INK_DIM,
+                        onClick = click,
+                    ),
+                )
+            }
+            rowPrem(
+                "精确闹钟", "到点准时触发（Android 12+ 需授权）", exactAlarmOk(),
+                android.content.Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, android.net.Uri.parse(pkg)),
+            )
+            rowPrem(
+                "电池不限制", "防止后台被省电策略冻结", batteryOk(),
+                android.content.Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, android.net.Uri.parse(pkg)),
+            )
+            rowPrem(
+                "通知权限", "发送结果提醒", notifOk(),
+                android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, ctx.packageName),
+            )
+            rowPrem(
+                "自启动 / 后台", "部分国产 ROM 需在系统里允许自启动", false,
+                android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse(pkg)),
+            )
+            rowPrem(
+                "锁定任务", "最近任务里锁定，防一键清理", false,
+                android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse(pkg)),
+            )
+        }
+    }
+
+    private fun wakeSummary(): String {
+        val entries = WakeLog.entries(shell.state.config)
+        if (entries.isEmpty()) return "还没有记录"
+        val pre = entries.count { it.method == DailyAlarm.LaunchMethod.PRELOAD }
+        val mon = entries.count { it.method == DailyAlarm.LaunchMethod.MONKEY }
+        val fail = entries.count { it.method == DailyAlarm.LaunchMethod.FAILED }
+        return "共 ${entries.size} 次 · 免root $pre / root $mon / 失败 $fail"
+    }
+
+    private fun showWakeLog() {
+        val entries = WakeLog.entries(shell.state.config).asReversed()
+        val fmt = java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.getDefault())
+        val body = if (entries.isEmpty()) {
+            "还没有唤醒记录。"
+        } else {
+            entries.joinToString("\n") { e ->
+                fmt.format(java.util.Date(e.at)) + "  " + when (e.method) {
+                    DailyAlarm.LaunchMethod.PRELOAD -> "免 root（preload）"
+                    DailyAlarm.LaunchMethod.MONKEY -> "root + monkey"
+                    DailyAlarm.LaunchMethod.FAILED -> "失败"
+                }
+            }
+        }
+        com.tiantong.spark.app.ui.v2.comp.Sheet.open(shell.activity, "唤醒日志") { b ->
+            b.addView(ctx.text(wakeSummary(), Tokens.T_SUB, Tokens.INK_DIM))
+            b.addView(
+                ctx.mono(body, 12f, Tokens.INK).apply { setLineSpacing(ctx.dpF(4f), 1f) },
+                ctx.lp(MATCH, WRAP, top = 8),
+            )
         }
     }
 

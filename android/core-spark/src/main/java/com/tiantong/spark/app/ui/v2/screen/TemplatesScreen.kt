@@ -276,19 +276,98 @@ class TemplatesScreen(private val shell: Shell) : PageView {
             return
         }
 
+        // 七档火花分组（全部 + 6 种状态），与首页状态标签一一对应
+        val groups: List<Pair<String, (com.tiantong.spark.app.config.model.ConversationSnapshot) -> Boolean>> = listOf(
+            "全部" to { _ -> true },
+            "已燃" to { s -> s.hasSpark && s.state == 1 },
+            "重燃中" to { s -> s.hasSpark && s.state == 3 },
+            "待燃" to { s -> s.hasSpark && s.state == 2 && shell.state.sentToday(s.conversationId) },
+            "待续" to { s -> s.hasSpark && s.state == 2 && !shell.state.sentToday(s.conversationId) },
+            "可点亮" to { s -> !s.hasSpark && s.stateText == "可点亮" },
+            "无火花" to { s -> !s.hasSpark && s.stateText != "可点亮" },
+        )
+
         val picked = LinkedHashSet<String>()
         val boxes = HashMap<String, android.widget.CheckBox>()
-        val body = ctx.column()
+        var filterIdx = 0
+        var current: List<com.tiantong.spark.app.config.model.ConversationSnapshot> = emptyList()
+
+        // 已经继承这个模板的预勾上（跨分组保留）
+        targets.forEach { t ->
+            if (config.conversation(t.conversationId)?.inheritFrom == group.id) picked.add(t.conversationId)
+        }
 
         val count = ctx.text("已勾 0 个", Tokens.T_SUB, Tokens.INK_DIM)
         var positive: android.widget.Button? = null
         fun syncCount() {
-            count.text = "已勾 ${picked.size} 个 · 本组 ${targets.size} 个"
-            // 主按钮跟着勾选数变，0 个时压暗——避免出现「克隆到 0 个会话」这种可点的空操作
+            count.text = "已勾 ${picked.size} 个 · 本组 ${current.size} 个"
             positive?.let {
                 it.text = if (picked.isEmpty()) "先勾几个会话" else "克隆到 ${picked.size} 个会话"
                 it.alpha = if (picked.isEmpty()) 0.45f else 1f
             }
+        }
+
+        val listBox = ctx.column()
+        fun rebuildList() {
+            listBox.removeAllViews()
+            boxes.clear()
+            current = targets.filter { groups[filterIdx].second(it) }
+            current.forEach { target ->
+                val inherited = config.conversation(target.conversationId)?.inheritFrom == group.id
+                val box = android.widget.CheckBox(ctx).apply {
+                    isChecked = picked.contains(target.conversationId)
+                    setOnCheckedChangeListener { _, checked ->
+                        if (checked) picked.add(target.conversationId) else picked.remove(target.conversationId)
+                        syncCount()
+                    }
+                }
+                boxes[target.conversationId] = box
+                listBox.addView(
+                    ctx.row().apply {
+                        gravity = Gravity.CENTER_VERTICAL
+                        setPadding(ctx.dp(14), ctx.dp(5), ctx.dp(14), ctx.dp(5))
+                        addView(box, ctx.lp(WRAP, WRAP))
+                        addView(ctx.text(target.displayName, 14f, Tokens.INK), ctx.lp(WRAP, WRAP, left = 2, weight = 1f))
+                        if (inherited) addView(ctx.text("已继承", 11f, Tokens.INK_DIM), ctx.lp(WRAP, WRAP))
+                        setOnClickListener { box.isChecked = !box.isChecked }
+                    },
+                    ctx.lp(MATCH, WRAP),
+                )
+            }
+            if (current.isEmpty()) {
+                listBox.addView(
+                    ctx.text("这一组没有会话", 13f, Tokens.INK_DIM).apply {
+                        setPadding(ctx.dp(16), ctx.dp(14), ctx.dp(16), ctx.dp(14))
+                    },
+                    ctx.lp(MATCH, WRAP),
+                )
+            }
+            syncCount()
+        }
+
+        val segRow = ctx.row()
+        fun rebuildSeg() {
+            segRow.removeAllViews()
+            groups.forEachIndexed { i, g ->
+                val on = i == filterIdx
+                segRow.addView(
+                    ctx.text(g.first, 12.5f, if (on) Tokens.INK else Tokens.INK_DIM, bold = on).apply {
+                        setPadding(ctx.dp(10), ctx.dp(6), ctx.dp(10), ctx.dp(6))
+                        background = ctx.shape(if (on) Tokens.SURFACE else Tokens.SEG_BG, 9)
+                        isClickable = true
+                        setOnClickListener {
+                            filterIdx = i
+                            rebuildSeg()
+                            rebuildList()
+                        }
+                    },
+                    ctx.lp(WRAP, WRAP).also { it.rightMargin = ctx.dp(6) },
+                )
+            }
+        }
+        val segScroll = android.widget.HorizontalScrollView(ctx).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(segRow)
         }
 
         val head = ctx.row().apply { gravity = Gravity.CENTER_VERTICAL }
@@ -297,7 +376,7 @@ class TemplatesScreen(private val shell: Shell) : PageView {
             ctx.text("全选", 12f, Tokens.ACCENT, bold = true).apply {
                 setPadding(ctx.dp(8), ctx.dp(4), ctx.dp(8), ctx.dp(4))
                 setOnClickListener {
-                    targets.forEach { picked.add(it.conversationId) }
+                    current.forEach { picked.add(it.conversationId) }
                     boxes.values.forEach { it.isChecked = true }
                     syncCount()
                 }
@@ -313,47 +392,21 @@ class TemplatesScreen(private val shell: Shell) : PageView {
                 }
             },
         )
-        body.addView(head, ctx.lp(MATCH, WRAP, left = 14, right = 14, bottom = 4))
 
-        targets.forEach { target ->
-            val inherited = config.conversation(target.conversationId)?.inheritFrom == group.id
-            val box = android.widget.CheckBox(ctx).apply {
-                isChecked = inherited
-                setOnCheckedChangeListener { _, checked ->
-                    if (checked) picked.add(target.conversationId)
-                    else picked.remove(target.conversationId)
-                    syncCount()
-                }
-            }
-            if (inherited) picked.add(target.conversationId)
-            boxes[target.conversationId] = box
-            val line = ctx.row().apply {
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(ctx.dp(14), ctx.dp(5), ctx.dp(14), ctx.dp(5))
-                addView(box, ctx.lp(WRAP, WRAP))
-                addView(
-                    ctx.text(target.displayName, 14f, Tokens.INK),
-                    ctx.lp(WRAP, WRAP, left = 2, weight = 1f),
-                )
-                if (inherited) {
-                    addView(
-                        ctx.text("已继承", 11f, Tokens.INK_DIM),
-                        ctx.lp(WRAP, WRAP),
-                    )
-                }
-                setOnClickListener { box.isChecked = !box.isChecked }
-            }
-            body.addView(line, ctx.lp(MATCH, WRAP))
-        }
-        syncCount()
+        rebuildSeg()
+        rebuildList()
 
-        val scroller = android.widget.ScrollView(ctx).apply {
-            addView(body, LinearLayout.LayoutParams(MATCH, WRAP))
-        }
+        val root = ctx.column()
+        root.addView(segScroll, ctx.lp(MATCH, WRAP, left = 12, right = 12, top = 6))
+        root.addView(head, ctx.lp(MATCH, WRAP, left = 14, right = 14, top = 4, bottom = 4))
+        root.addView(
+            android.widget.ScrollView(ctx).apply { addView(listBox, LinearLayout.LayoutParams(MATCH, WRAP)) },
+            ctx.lp(MATCH, WRAP),
+        )
 
         val dialog = android.app.AlertDialog.Builder(ctx)
             .setTitle("克隆「${group.name}」到…")
-            .setView(scroller)
+            .setView(root)
             .setPositiveButton("先勾几个会话", null)
             .setNegativeButton("取消", null)
             .create()
@@ -367,10 +420,10 @@ class TemplatesScreen(private val shell: Shell) : PageView {
                     return@setOnClickListener
                 }
                 val stamp = System.currentTimeMillis()
-                shell.state.update { current ->
-                    var next = current
+                shell.state.update { current0 ->
+                    var next = current0
                     picked.forEach { id ->
-                        val old = current.conversation(id)
+                        val old = current0.conversation(id)
                         val item = if (old == null) {
                             com.tiantong.spark.app.config.model.ConversationTemplate(
                                 conversationId = id,
