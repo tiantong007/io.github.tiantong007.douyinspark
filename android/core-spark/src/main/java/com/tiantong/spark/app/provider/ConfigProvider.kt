@@ -264,12 +264,13 @@ class ConfigProvider : ContentProvider() {
             }
             val png = File(dir, "$key.png")
             val marker = File(dir, "$key.url")
-            val url = urls.getString(key).orEmpty()
-            if (png.isFile && url.isNotEmpty() && runCatching { marker.readText() }.getOrNull() == url) return@forEach
+            // 去域名化：只比较/记录 URL 里 /obj/ 之后的路径，CDN 换域名时同一个对象不再被当成「变了」
+            val markerValue = objectPath(urls.getString(key).orEmpty())
+            if (png.isFile && markerValue.isNotEmpty() && runCatching { marker.readText() }.getOrNull() == markerValue) return@forEach
             runCatching {
                 dir.mkdirs()
                 png.writeBytes(bytes)
-                if (url.isNotEmpty()) marker.writeText(url) else marker.delete()
+                if (markerValue.isNotEmpty()) marker.writeText(markerValue) else marker.delete()
                 written++
             }.onFailure { ok = false }
         }
@@ -282,6 +283,12 @@ class ConfigProvider : ContentProvider() {
      * 宿主只按 md5 推图片，App 侧靠这个索引才能列出「抖音当前下发的全部表情」。
      * 增量合并：新名字追加到末尾，已存在的位置不动（编辑器列表顺序稳定）。
      */
+    /** URL 去域名化：取 `/obj/` 起的路径；没有则原样返回。用于图片「没变就跳过写入」的比较。 */
+    private fun objectPath(url: String): String {
+        val i = url.indexOf("/obj/")
+        return if (i >= 0) url.substring(i) else url
+    }
+
     private fun writeEmojiIndex(
         context: Context,
         dir: File,

@@ -46,7 +46,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        minSdk = 26
+        minSdk = 28
         buildConfigField("String", "CONTENT_SHA256", "\"${computeContentSha256()}\"")
     }
 

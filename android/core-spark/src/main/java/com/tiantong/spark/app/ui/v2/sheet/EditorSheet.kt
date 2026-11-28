@@ -19,6 +19,7 @@ import com.tiantong.spark.app.ui.v2.comp.WRAP
 import com.tiantong.spark.app.ui.v2.comp.Sheet
 import com.tiantong.spark.app.ui.v2.comp.card
 import com.tiantong.spark.app.ui.v2.comp.chips
+import com.tiantong.spark.app.ui.v2.comp.column
 import com.tiantong.spark.app.ui.v2.comp.divider
 import com.tiantong.spark.app.ui.v2.comp.field
 import com.tiantong.spark.app.ui.v2.comp.formHint
@@ -296,20 +297,84 @@ object EditorSheet {
     }
 
     private fun pickEmoji(shell: Shell, editor: EditText) {
-        // 全量目录 = 宿主同步的 index.json ∪ 硬编码兜底（原型 pickEmoji 的 STICKER 列表）
-        val names = EmojiImages.names(shell.context)
-        val labels = (names + listOf("手动输入名字…")).toTypedArray()
-        AlertDialog.Builder(shell.activity)
-            .setTitle("插入表情")
-            .setItems(labels) { _, which ->
-                if (which < names.size) {
-                    insertEmoji(shell, editor, names[which])
+        // 全量目录 = 宿主同步的 index.json ∪ 硬编码兜底
+        val ctx = shell.context
+        val activity = shell.activity
+        val names = EmojiImages.names(ctx)
+        var dialog: AlertDialog? = null
+
+        val grid = ctx.column().apply { setPadding(ctx.dp(16), ctx.dp(8), ctx.dp(16), ctx.dp(10)) }
+        val cols = 4
+        var i = 0
+        while (i < names.size) {
+            val rowV = ctx.row()
+            for (c in 0 until cols) {
+                val idx = i + c
+                if (idx >= names.size) {
+                    rowV.addView(View(activity), ctx.lp(0, WRAP, 1f))
                 } else {
-                    askEmojiName(shell, editor)
+                    val name = names[idx]
+                    rowV.addView(
+                        emojiCell(shell, name) {
+                            dialog?.dismiss()
+                            insertEmoji(shell, editor, name)
+                        },
+                        ctx.lp(0, WRAP, 1f),
+                    )
                 }
             }
+            grid.addView(rowV, ctx.lp(MATCH, WRAP, top = 4))
+            i += cols
+        }
+        grid.addView(
+            ctx.text("手动输入名字…", Tokens.T_SUB, Tokens.ACCENT, bold = true).apply {
+                setPadding(0, ctx.dp(14), 0, ctx.dp(6))
+                isClickable = true
+                setOnClickListener { dialog?.dismiss(); askEmojiName(shell, editor) }
+            },
+            ctx.lp(MATCH, WRAP),
+        )
+
+        val scroll = android.widget.ScrollView(activity).apply { isFillViewport = false }
+        scroll.addView(grid)
+        dialog = AlertDialog.Builder(activity)
+            .setTitle("插入表情")
+            .setView(scroll)
             .setNegativeButton("取消", null)
-            .show()
+            .create()
+        dialog.show()
+    }
+
+    /** 表情选择格：取得到图就显示缩略图，取不到退回火焰图标，下面标名字。 */
+    private fun emojiCell(shell: Shell, name: String, onClick: () -> Unit): View {
+        val ctx = shell.context
+        val cell = ctx.column().apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(ctx.dp(4), ctx.dp(8), ctx.dp(4), ctx.dp(8))
+            isClickable = true
+            setOnClickListener { onClick() }
+        }
+        val bmp = EmojiImages.bitmap(ctx, name)
+        if (bmp != null) {
+            cell.addView(
+                android.widget.ImageView(ctx).apply {
+                    setImageBitmap(bmp)
+                    scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                },
+                ctx.lp(52, 52),
+            )
+        } else {
+            cell.addView(ctx.icon(Tokens.Icon.FIRE, 24f, Tokens.WARN), ctx.lp(52, 52))
+        }
+        cell.addView(
+            ctx.text(name, Tokens.T_TINY, Tokens.INK_DIM).apply {
+                gravity = Gravity.CENTER
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            },
+            ctx.lp(MATCH, WRAP, top = 4),
+        )
+        return cell
     }
 
     /** 空脚本给整句；已有内容另起一整句（表情是对象，不能和字符串相加）。 */

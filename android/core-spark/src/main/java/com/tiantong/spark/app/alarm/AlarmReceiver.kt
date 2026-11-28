@@ -1,4 +1,4 @@
-﻿package com.tiantong.spark.app.alarm
+package com.tiantong.spark.app.alarm
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -58,7 +58,7 @@ class AlarmReceiver : BroadcastReceiver() {
         // 先记下「今天已跑过」标记文件的 mtime，再拉起抖音。
         // 后面的判据是「它变大了」= 本轮真的跑完，而不是「内容等于今天」（早就是今天了）。
         val baseline = RootShell.modifiedAt(DAY_FILE)
-        val method = DailyAlarm.launchDouyin()
+        val method = DailyAlarm.launchDouyin(app)
         Log.i(TAG, "闹钟触发：拉起抖音 $method，基线 mtime=$baseline，开始等发送完成")
         if (method == DailyAlarm.LaunchMethod.FAILED) return
         watchAndClose(baseline)

@@ -40,7 +40,7 @@ android {
         applicationId = "io.github.tiantong007.douyinspark"
         versionCode = 34500
         versionName = "v3.4.5"
-        minSdk = 26
+        minSdk = 28
         targetSdk = 36
     }
 

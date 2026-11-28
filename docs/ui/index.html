@@ -55,9 +55,9 @@ background:radial-gradient(circle,rgba(254,44,85,.55),rgba(254,44,85,0) 70%)}
 .segmented button{flex:1;font:inherit;font-size:12px;padding:7px 1px;border:0;border-radius:9px;background:none;color:var(--dim);cursor:pointer}
 .segmented button.on{background:#fff;color:var(--ink);font-weight:650;box-shadow:0 1px 2px rgba(0,0,0,.06)}
 .list{background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.045)}
-.gsec{display:flex;align-items:center;gap:7px;padding:12px 15px 7px;background:#fff;font-size:12.5px;font-weight:700;color:var(--dim);cursor:pointer;user-select:none}
-.gsec .cv{font-size:11px;line-height:1;color:var(--dim)}
-.gsec .cnt{margin-left:auto;font-weight:600;color:var(--dim);background:rgba(0,0,0,.05);border-radius:8px;padding:1px 7px;font-size:11px}
+.gsec{display:flex;align-items:center;gap:8px;padding:13px 15px 9px;background:#fff;font-size:14px;font-weight:750;color:var(--ink);cursor:pointer;user-select:none}
+.gsec .cv{font-size:12.5px;line-height:1;color:var(--dim)}
+.gsec .cnt{margin-left:auto;font-weight:650;color:var(--dim);background:rgba(0,0,0,.05);border-radius:8px;padding:1px 8px;font-size:12px}
 .row{display:flex;align-items:center;gap:12px;padding:12px 15px;min-height:66px;box-sizing:border-box;cursor:pointer;border-bottom:1px solid var(--line)}
 .row:last-child{border-bottom:0}
 .av{width:42px;height:42px;border-radius:50%;flex:0 0 42px;object-fit:cover;background:#DDE0E6;
@@ -204,6 +204,24 @@ font-size:12px;line-height:1.75;color:#E4E6EB;background:#17191F;border:0;border
 .stk{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-height:52vh;overflow:auto;padding-right:2px}
 .stk button{font:12.5px inherit;font-weight:600;padding:11px 2px;border:0;border-radius:10px;background:var(--seg);color:var(--ink);cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .stk button:active{background:var(--accent-soft);color:var(--accent)}
+.stk button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:9px 2px}
+.stk button img{width:44px;height:44px;object-fit:contain}
+.stk button .sf{width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--warn)}
+.stk button .sn{font-size:11px;font-weight:600;line-height:1.1;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.docbody{padding:2px 2px 20px}
+.docbody h2{font-size:19px;margin:18px 0 8px}
+.docbody h3{font-size:15.5px;margin:16px 0 6px}
+.docbody h4{font-size:14px;margin:14px 0 5px}
+.docbody p{margin:8px 0;line-height:1.7}
+.docbody ul,.docbody ol{margin:8px 0;padding-left:20px;line-height:1.7}
+.docbody pre{background:var(--seg);color:var(--ink);padding:11px 12px;border-radius:10px;overflow:auto;font-size:12px;line-height:1.55;margin:10px 0}
+.docbody code{background:var(--seg);padding:1px 5px;border-radius:5px;font-size:12.5px}
+.docbody pre code{background:none;padding:0}
+.docbody table{width:100%;border-collapse:collapse;margin:10px 0;font-size:12.5px}
+.docbody th,.docbody td{border:1px solid var(--line);padding:6px 8px;text-align:left}
+.docbody img{max-width:100%;border-radius:10px;margin:8px 0}
+.docbody a{color:var(--accent)}
+.docbody hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 .undef{color:#E0523B;font-weight:650}
 .vgrp{font-size:11px;color:var(--dim);letter-spacing:.4px;margin:12px 0 4px}
 .vgrp:first-child{margin-top:0}
@@ -280,8 +298,19 @@ font-size:13px;padding:10px 16px;border-radius:12px;opacity:0;transition:.2s;z-i
 .dbox .row2 button{font:13.5px inherit;font-weight:650;padding:9px 15px;border:0;border-radius:10px;background:var(--seg);color:var(--ink);cursor:pointer}
 .dbox .row2 button.pri{background:var(--accent);color:#fff}
 .dbox .row2 button.dgr{background:rgba(229,72,77,.1);color:var(--danger)}
+.pmlist{display:flex;flex-direction:column;gap:2px;max-height:60vh;overflow:auto;margin-top:2px}
+.pmrow{display:flex;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid var(--line)}
+.pmrow:last-child{border-bottom:0}
+.pmmid{flex:1;min-width:0}
+.pmt{font-size:14px;font-weight:650;color:var(--ink);display:flex;align-items:center;gap:6px}
+.pms{font-size:11.5px;color:var(--dim);margin-top:2px;line-height:1.5}
+.pmust{font-size:10px;font-weight:700;color:var(--danger);background:rgba(229,72,77,.1);border-radius:5px;padding:1px 5px}
 .dlist{max-height:300px;overflow:auto}
 .dlist a{display:block;padding:12px 4px;border-bottom:1px solid var(--line);font-size:14.5px;color:var(--ink);cursor:pointer}
+.sec{display:flex;align-items:center;justify-content:space-between;padding:18px 4px 8px}
+.sec .sublabel{padding:0}
+.sec .q{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--faint);color:var(--faint);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:help;flex:0 0 18px}
+.dangerRow .tt{color:var(--danger)}.dangerRow .gi{color:var(--danger)}
 </style></head><body>
 <div class="layout">
 <div class="side">
@@ -313,6 +342,146 @@ font-size:13px;padding:10px 16px;border-radius:12px;opacity:0;transition:.2s;z-i
   <div class="dialog" id="dlg"><div class="dbox" id="dlgbox"></div></div>
   <div class="toast" id="toast"></div>
 </div></div></div></div>
+<script type="text/markdown" id="manualMd">
+# 抖音续火花cc
+
+抖音「自动续火花」LSPosed 模块。给抖音判定今天还没互动的会话，自动发一条你自己写的私信，每会话每天最多一条。
+
+<!-- version-anchor: v3.4.5 (34500) -->
+**v3.4.5**（versionCode 34500）· Android 9+ / Root / LSPosed 2.x · arm64-v8a
+
+## 界面预览
+
+<img src="docs/ui/screenshot.png" alt="状态看板：三个大数字（自动发送 / 已续 / 已燃）+ 两行分段 + 会话列表" width="360">
+
+以上是从原型截的**状态看板**：左「自动发送」、中「已续」、右「已燃」三个大数字，下面是名单构成与「下一轮」时间；再往下是两行分段（火花五档 / 发送名单两档）和会话列表——第一行名字 + 🔥火花天数，第二行「默认 / 固定发送 / 固定不发」三态徽章 + 状态徽章，行尾是勾选开关。
+
+不用装就能看 —— 仓库里带一份**能点的原型**：
+
+- 在线：<https://tiantong007.github.io/io.github.tiantong007.douyinspark/ui/>
+- 本地：双击 [`docs/ui/index.html`](docs/ui/index.html)，单文件、不联网
+
+原型是照安装包里的真实尺寸做的（1px = 1dp，图标用的就是包里那份字体）。抽屉能开、五档和发送名单两档能切、点会话进编辑弹层、勾选后右下角冒出「立即发送 N 个」、预览能展开、设置开关能翻。里面的数据是示例。
+
+## 它能做什么
+
+- **自动续火花**：五档分类（全部 / 已燃 / 待燃 / 待续 / 无火花）；第二行另有一套发送名单（自动发送 / 不发送），决定「该续的时候谁会被自动续」，该发的自动发，也可以手动勾选发
+- **互动表情**：发抖音的火焰表情（`msgType=5`），不是文字；目录从抖音配置里读，当前 21 个
+- **定时唤醒**：每天到点拉起抖音发完再关掉，不亮屏、不解锁（优先免 root 预加载，失败自动回退 root；另有 15 分钟 JobScheduler 调度兜底）
+- **模板**：内置 2 个，自定义支持继承（跟随父模板）和克隆（复制后独立）
+- **零联网**：不申请 `INTERNET`，头像和表情图都由抖音进程取好后推过来（表情图不打包进 APK，运行时从抖音下载并缓存到 `cache/emojis`；缓存就绪前预览先显示火焰图标兜底）
+
+## 安装
+
+1. 装 APK
+2. LSPosed 里启用，勾作用域「抖音」（装完通常已自动勾好）
+3. **强制停止抖音再打开**
+4. 打开模块 App 一次，看「设置 → 运行日志」有没有内容
+
+覆盖安装不丢配置；**换签名或卸载会丢**（配置在 App 私有目录，可用 root 自行备份）。
+
+## 界面
+
+抽屉四个入口：**状态看板 / 模板 / 设置 / 使用文档**，右上角 ⚙ 直达设置。
+
+**状态看板**：深色卡上是**三个大数字**（26sp 等分，左中右贴边）——左「自动发送」（名单人数）、中「已续」、右「已燃」，只报绝对数不摆分母；下面一行小字是名单构成（固定发送 / 有火花 / 不会续）和「自动续火花已开启 · 下一轮 HH:MM」。
+
+往下是**两行分段**：第一行火花五档（全部 / 已燃 / 待燃 / 待续 / 无火花），第二行发送名单两档（自动发送 N / 不发送 N）。两行互斥——点哪一行就按哪一行的口径看列表，再点一次同一档退出。
+
+每一行会话是两行结构：第一行名字 + 🔥火花天数（群聊多一个蓝色「群」徽章）；第二行「默认 / 固定发送 / 固定不发」三态徽章 + 状态徽章（已燃 / 待燃 / 待续 / 重燃中 / 可点亮 / 无火花）+ 没文案时的「无文案」+ 一句说明。行尾：看板档是勾选开关，名单档是「恢复默认 / 固定发送 / 固定不发」按钮。
+
+**自动发送名单**：只回答「总开关开着、今天该续的时候，谁会被自动续」，跟今天续没续过**完全无关**。有火花就默认在名单里（已燃只是今天续过了，明天照样续）；固定发送让没火花的也每天发；固定不发永远不自动续，点「恢复默认」放回抖音判定。名单里没文案的人排在最前并标「无文案」，自动发送会跳过。手动勾选发送不受名单影响。
+
+**模板**：内置两张 + 我的模板。每张卡底部平铺五个等宽按钮：**编辑 / 预览 / 克隆 / 重命名 / 删除**（删除是浅红，破坏性放最后），不再有「更多」二级菜单。克隆是**多选**：勾一批人一次写完，顶部有「全选 / 清空」和已选计数，已经继承这个模板的会预勾上并标「已继承」；主按钮跟着勾选数变，一个没勾时压暗成「先勾几个会话」。
+
+**变量**：不再单独占一页。变量是**模板配置**——模板里写 `<名字>` + `<表达式>`，脚本里用 `${ctx.template.vars["名字"]}` 取；编辑器里的「变量」按钮只负责把路径插进光标处，内置路径都是 `ctx.builtin.*` / `ctx.io.*`，会话层同名覆盖模板层。
+
+**设置**：发送（总开关 / 只在设定时间检查）、定时唤醒（选时间 / 关闭）、诊断（运行日志 / 安装包自校验）、关于。
+
+**编辑弹层**：会话模式底部四个按钮——模板 / 表情 / 变量 / 预览（模板模式没有「模板」按钮）。表情点开是 21 个表情的网格，内容空就插整句、非空就插片段。保存时自动清掉零宽字符和中文引号。
+
+## 什么时候会发
+
+抖音冷启动（等 5 秒起探测）、回到前台、跨天补跑、定时唤醒、手动点发送。
+
+- 自动轮只发「待续」，且必须在自动发送名单里（固定不发除外），其他档可以手动勾选发
+- 每会话每天最多一条，跨天重置
+- 抖音没在运行就发不出去（模块注入在抖音进程里）
+- 一个会话可以分多条发（脚本里 `ctx.commit()` 切段），条数没有硬上限，但建议 1～3 条
+
+**总开关只管自动轮，不拦手动点**。
+
+## 定时唤醒（优先免 root，回退 root）
+
+模块代码跑在抖音进程里，抖音不启动就没人干活。所以到点用 `AlarmManager` 把抖音拉起来：
+
+```
+到点 → AlarmManager 叫醒模块 → 优先免 root：向抖音 preload provider 取 client 拉起主进程
+                              （不可达则回退 su -c monkey，不亮屏）
+     → 扫描 → 发送 → 写标记 → 模块检测到已发 → am force-stop 关掉抖音
+```
+
+优先走免 root 的 `content://com.ss.android.ugc.aweme.depths.pre.load`（`acquireUnstableContentProviderClient` 会触发抖音主进程启动，不需要 su）；该 provider 不可达时自动回退 root + `monkey`（`monkey` 只接受 root / shell 身份，普通 App 执行会被 `Killed`）。另外登记一个 15 分钟周期的 JobScheduler 作调度兜底，只负责把一次性闹钟重新排上，绝不重复触发发送。
+
+申请 4 个权限：`SCHEDULE_EXACT_ALARM` `USE_EXACT_ALARM` `RECEIVE_BOOT_COMPLETED` `WAKE_LOCK`。没有 `INTERNET`、没有悬浮窗、没有存储权限。
+
+注意：手动「一键清理」会把闹钟一起清掉，需要手动开一次本模块 App 恢复。
+
+## 脚本 API
+
+脚本是 JavaScript，跑在 Rhino 里，能力全挂在 `ctx` 上。
+
+```js
+// 最小写法：发一条文字
+ctx.result.push("火花 " + ctx.io.days + " 天啦");
+
+// 分条发：commit 一次切一条，条数没有硬上限（建议 1～3 条）
+ctx.result.push("早，今天也续上");
+ctx.commit();
+ctx.result.push("火花别断");
+
+// 发表情：自成一条，不跟文字合并
+ctx.result.push({ type: "emoji", name: "续火花" });
+```
+
+| 方法 | 作用 |
+|---|---|
+| `ctx.result.push(x)` | 加一行；空列表 = 这条不发 |
+| `ctx.commit()` | 把当前内容收成一条，之后接着攒 |
+| `ctx.submit()` / `ctx.exit()` | 收尾立刻结束 / 放弃这一轮 |
+| `ctx.emoji.list()` / `get(name)` / `emoji(name)` | 表情目录（21 个） |
+
+变量分两处：`ctx.builtin`（`date` `time` `weekday` `timestamp` `pick` `random` `shuffle` `countdown` `formatDate`）和 `ctx.io`（`nickname` `remark` `name` `days` `state` `stateText` `peerUid` `id`）。自定义变量在 `ctx.template.vars["名字"]`，**没有裸变量名**，写 `nickname` 会报 `ReferenceError`。
+
+报错会显示成 `失败：XXX（脚本第 3 行出错：missing variable name）`，行号是你的脚本里的行号。
+
+## 常见问题
+
+**「待续」是 0？** 今天该发的都发完了，明天再来。
+
+**发了没反应？** 确认抖音在运行；看「设置 → 运行日志」；改完 APK 必须重启抖音。
+
+**已燃和待燃的区别？** 已燃 = 抖音说今天已互动；待燃 = 我们发了但对方没回。
+
+**半夜突然发出去了？** 跨天补跑不受「只在设定时间检查」管辖，不想半夜发就把它打开。
+
+**闹钟响了抖音没起来？** ① KernelSU/Magisk 里给本模块授权；② 是否做过一键清理；③ 是否装了两个同包名版本。
+
+**给没火花的人发？** 在「无火花」档点进去写脚本，勾选后手动发。想让他每天都自动续，就在发送名单里把他设成「固定发送」。
+
+**名单里那个人为什么显示「无文案」？** 他没写脚本、也没挂宏——自动发送会跳过。模板正文不参与判定，所以「继承了模板」不算有文案。
+
+**名单里出现「已失联的会话」？** 那个人删了好友或换了会话 id，你之前设的固定发送/固定不发还留着。点「恢复默认」清掉。
+
+**配置会不会丢？** 覆盖安装不会，换签名或卸载会。先导出备份。
+
+## 数据与许可
+
+配置在 `/data/data/io.github.tiantong007.douyinspark/files/spark_config.json`，头像和表情图缓存在同 App 的 `cache/` 下。**不上报任何数据**。
+
+Apache-2.0，全文见 [LICENSE](LICENSE)。部分抖音 IM 协议细节参考了 [yfishyon/doumcp](https://github.com/yfishyon/doumcp)（Apache-2.0）的公开实现。
+
+</script>
 <script>
 
 const BODY = {"demo-01":"ctx.result.push({ type: \"emoji\", name: \"续火花\" });","demo-02":"ctx.result.push({ type: \"emoji\", name: \"续火花\" });","demo-03":"ctx.result.push({ type: \"emoji\", name: \"续火花\" });","demo-04":"ctx.result.push({ type: \"emoji\", name: \"续火花\" });","demo-05":"ctx.result.push({ type: \"emoji\", name: \"续火花\" });","demo-06":"ctx.result.push(\"已经 \" + ctx.io.days + \" 天啦\");\nctx.result.push({ type: \"emoji\", name: \"续火花\" });","demo-07":"ctx.result.push({ type: \"emoji\", name: \"续火花\" });","demo-08":"ctx.result.push({ type: \"emoji\", name: \"续火花\" });","demo-09":"ctx.result.push({ type: \"emoji\", name: \"续火花\" });","demo-10":"ctx.result.push(\"今天 \" + ctx.io.days + \" 天了~\");","demo-21":"ctx.result.push({ type: \"emoji\", name: \"续火花\" });","demo-22":"ctx.result.push({ type: \"emoji\", name: \"续火花\" });","demo-23":"ctx.result.push({ type: \"emoji\", name: \"续火花\" });","demo-24":"ctx.result.push({ type: \"emoji\", name: \"续火花\" });"};   // 每个会话自己的脚本；不在表里 = 还没写
@@ -325,7 +494,7 @@ download:'\ueac2',import:'\ueac3',lock:'\uea75',more:'\uea7c',old:'\ueb28',clipp
 const ic = (k, sz, col) => '<span class="ic" style="font-size:' + (sz||15) + 'px' + (col ? ';color:' + col : '') + '">' + IC[k] + '</span>';
 
 const S = {page:'home', filter:0, pfilter:0, mstat:-1, picked:new Set(), enabled:D.enabled, checkAtAlarm:false,
-  alarm:[D.ah, D.am], drawer:false, tpls:D.tpl.slice(), sheet:null, preview:null, gsec:{group:false, person:false}};
+  alarm:[D.ah, D.am], alarmOn:true, perm:{exact:true, auto:false, battery:false, notify:true}, drawer:false, tpls:D.tpl.slice(), sheet:null, preview:null, gsec:{group:false, person:false}};
 
 const TITLES = {home:'状态看板', templates:'模板', settings:'设置', docs:'使用文档'};
 // 无火花：没有状态文本（还没建立火花），或状态是「可点亮」这类未点亮的
@@ -359,7 +528,7 @@ function cmpRows(a, b){
   return String(a.n || '').localeCompare(String(b.n || ''), 'zh');
 }
 function toggleGSec(i){ const k = i === 0 ? 'group' : 'person'; S.gsec[k] = !S.gsec[k]; render(); }
-// 把已排序数组拆成「群聊 / 单聊」两段渲染；renderRow(r) 决定普通行还是名单行
+// 把已排序数组拆成「群聊 / 好友」两段渲染；renderRow(r) 决定普通行还是名单行
 function groupedListHtml(list, renderRow){
   if (!list.length) return '';
   function sec(i, title, arr){
@@ -371,7 +540,7 @@ function groupedListHtml(list, renderRow){
     if (!collapsed) s += arr.map(renderRow).join('');
     return s;
   }
-  return sec(1, '私聊', list.filter(r => !r.g)) + sec(0, '群聊', list.filter(r => r.g));
+  return sec(1, '好友', list.filter(r => !r.g)) + sec(0, '群聊', list.filter(r => r.g));
 }
 const hhmm = (h, m) => String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
 
@@ -408,7 +577,7 @@ function home(){
   const total = PENDING().length + SENT().length, hot = PENDING().length;
   const inN = autoRows.filter(r => memOf(r) === 'in').length;
   const noN = NOSEND().length;
-  const next = S.alarm[0] >= 0 ? hhmm(S.alarm[0], S.alarm[1]) : '未设置';
+  const next = S.alarm[0] >= 0 ? hhmm(S.alarm[0], S.alarm[1]) : '未设';
   // 分母与分子同源：名单为空时退回当前分组，否则会出现「0 / 22 已续」
   const statRows = autoN > 0 ? autoRows : shown();
   const denom = statRows.length;
@@ -416,7 +585,7 @@ function home(){
   const lit = statRows.filter(r => r.x === 1).length;
   const mview = S.mstat >= 0;   // 第二行是否在生效
 
-  let h = '<div class="hero"><div class="lab"><i></i>记录时间 ' + D.today + ' 22:14</div>' +
+  let h = '<div class="hero"><div class="lab"><i></i>记录时间 ' + D.today + ' 22:14 · 抖音在线</div>' +
     '<div class="bigrow three">' +
       '<div class="big">' + autoN + '<small>自动发送</small></div>' +
       '<div class="big">' + done + '<small>已续</small></div>' +
@@ -440,11 +609,12 @@ function home(){
   list.sort(cmpRows);   // 统一排序：无文案 → 有火花(天数降序) → 无火花，所有列表同一口径
 
   if (!list.length) {
-    const msg = mview
+    const msg = D.rows.length === 0 ? ['search','还没有会话数据','进一次抖音回来点右上角刷新']
+      : mview
       ? (S.mstat === 0 ? ['check','自动发送名单是空的','所有会话都被固定不发了'] : ['check','不发送名单是空的','所有人都还会自动续火花'])
       : S.filter === 3 && hot === 0 ? ['check','今天都续完了','该续的都已经发过，明天再来']
       : S.filter === 4 ? ['fire','没有无火花的会话','所有会话的火花都还在']
-      : ['search','这个筛选下没有人','换一个查看条件试试'];
+      : ['search','这一档没有人','换一个查看条件试试'];
     h += '<div class="card" style="padding:0">' + empty(msg[0], msg[1], msg[2]) + '</div>';
   } else {
     h += '<div class="list">' + groupedListHtml(list, r => mview ? memRow(r) : row(r, { acts: false })) + '</div>';
@@ -476,10 +646,9 @@ function subOf(r){
 function row(r, o){
   o = o || {};
   const sub = o.sub != null ? o.sub : subOf(r);
-  const rf = r.x === 3 ? /(\d+)\s*\/\s*(\d+)/.exec(r.fl || '') : null;
   const tag = r.x === -1
     ? (r.st === '可点亮' ? '<span class="tag light">可点亮</span>' : '<span class="tag none">无火花</span>')
-    : r.x === 3 ? '<span class="tag recov">重燃中' + (rf ? ' ' + rf[1] + '/' + rf[2] : '') + '</span>'
+    : r.x === 3 ? '<span class="tag recov">重燃中</span>'
     : r.x === 2 ? (r.s ? '<span class="tag wait">待燃</span>' : '<span class="tag wait">待续</span>')
     : '<span class="tag done">已燃</span>';
   const ms = memOf(r);
@@ -566,7 +735,7 @@ function renameTpl(i){
     '<button class="pri" onclick="closeDialog();toast(\'已重命名\')">保存</button></div>');
 }
 function delTpl(i){
-  confirmBox('删除模板','「' + S.tpls[i].n + '」会从列表里移除，已经复制到会话里的文案保留。','删除',
+  confirmBox('删除模板','「' + S.tpls[i].n + '」会从列表移除；已复制到会话里的文案保留。','删除模板',
     'function(){S.tpls.splice(' + i + ',1);render();toast(\'已删除\')}', true);
 }
 
@@ -575,12 +744,12 @@ function templates(){
   h += BUILTIN.map((b,i) => '<div class="card"><h3>' + b.n + '<span class="badge">内置</span></h3>' +
     '<div class="hint">' + b.note + '</div>' +
     '<div class="editor">' + esc(b.b) + '</div>' +
-    '<div class="actions"><button class="mini primary" onclick="useBuiltin(' + i + ')">用这个建模板</button>' +
+    '<div class="actions" style="justify-content:flex-end"><button class="mini primary" onclick="useBuiltin(' + i + ')">用这个建模板</button>' +
     '<button class="mini" onclick="openPreviewB(' + i + ')">按条预览</button></div></div>').join('');
   h += '<div class="sublabel" style="display:flex;align-items:center">我的模板（' + S.tpls.length + '）' +
     '<button class="mini" style="margin-left:auto;font-size:12px;padding:6px 11px" onclick="openEditorNew()">' +
     '<span class="ic" style="font-size:11px">' + IC.add + '</span> 新建</button></div>';
-  if (!S.tpls.length) h += '<div class="card" style="padding:0">' + empty('tpl','还没有模板','内置模板可以一键新建') + '</div>';
+  if (!S.tpls.length) h += '<div class="card" style="padding:0">' + empty('tpl','还没有自己的模板','上面的内置模板点「用这个建模板」就会出现在这里') + '</div>';
   h += S.tpls.map((t,i) => '<div class="card"><h3>' + t.n + '<span class="badge info">' + t.m + ' 个会话</span></h3>' +
     '<div class="editor">' + esc(firstLines(t.b)) + '</div>' +
     '<div class="actions five">' +
@@ -651,37 +820,133 @@ function pseg(labels, cur, fn){
   }).join('') + '</div>';
 }
 function setMStat(i){ S.mstat = (S.mstat === i ? -1 : i); render(); }
+// ── 定时唤醒开关 + 权限检测引导 ──────────────────────────────
+// ── 唤醒日志（网页 mock；真机需把 LaunchMethod 结果落盘）─────────────
+const WAKE = [
+  {t:'11-28 08:00', m:'preload'},
+  {t:'11-27 08:00', m:'preload'},
+  {t:'11-26 08:00', m:'monkey'},
+  {t:'11-25 08:00', m:'preload'},
+  {t:'11-24 08:00', m:'fail'},
+  {t:'11-23 08:00', m:'preload'},
+  {t:'11-22 08:00', m:'preload'},
+];
+const WAKE_M = {preload:'免 root（preload）', monkey:'root + monkey', fail:'失败'};
+function wakeStats(){ const s={n:WAKE.length, preload:0, monkey:0, fail:0}; WAKE.forEach(function(w){ s[w.m]++; }); return s; }
+function wakeRow(){
+  const s = wakeStats();
+  return irow('book', '唤醒日志', '共 ' + s.n + ' 次 · 免 root ' + s.preload + ' / root ' + s.monkey + ' / 失败 ' + s.fail, '查看', 'openWakeLog()');
+}
+function openWakeLog(){
+  const s = wakeStats();
+  const rows = WAKE.map(function(w){
+    const cls = w.m === 'fail' ? 'none' : (w.m === 'monkey' ? 'wait' : 'done');
+    return '<div class="pmrow"><div class="pmmid"><div class="pmt">' + w.t + '</div></div><span class="tag ' + cls + '">' + WAKE_M[w.m] + '</span></div>';
+  }).join('');
+  dialog('<h4>唤醒日志</h4>' +
+    '<p style="margin:2px 0 12px;color:var(--dim);font-size:12.5px">共 ' + s.n + ' 次 · 免 root ' + s.preload + ' 次 / root+monkey ' + s.monkey + ' 次 / 失败 ' + s.fail + ' 次。免 root 用抖音 preload provider，失败才回退 root。</p>' +
+    '<div class="pmlist">' + rows + '</div>' +
+    '<div class="row2" style="margin-top:14px"><button class="pri" onclick="closeDialog()">确定</button></div>');
+}
+const PERMS = [
+  {k:'exact',   t:'精确闹钟',    s:'到点准时叫醒；系统不给会明显不准甚至不触发', must:true},
+  {k:'auto',    t:'自启动/后台', s:'开机或清理后仍能拉起，国产 ROM 建议开', must:false},
+  {k:'battery', t:'电池不限制',  s:'不被省电策略冻结后台', must:false},
+  {k:'lock',    t:'锁定任务',    s:'在最近任务里锁定，防止被一键清理（按需开启）', must:false},
+];
+function permMissing(){ return PERMS.filter(function(p){ return !S.perm[p.k]; }); }
+function permRow(){
+  const miss = permMissing();
+  if (!miss.length){
+    return '<div class="iconrow" onclick="permSheet()"><span class="ic gi">' + IC.shield + '</span>' +
+      '<div class="mid"><div class="tt">权限检查</div><div class="st">精确闹钟 / 自启动 / 电池 / 通知 都已就绪</div></div>' +
+      '<span class="tag done">正常</span><span class="ic ch">' + IC.chev + '</span></div>';
+  }
+  return '<div class="iconrow" onclick="permSheet()"><span class="ic gi">' + IC.shield + '</span>' +
+    '<div class="mid"><div class="tt">权限检查</div><div class="st">还需开启：' + miss.map(function(p){return p.t;}).join('、') + '</div></div>' +
+    '<span class="tag" style="background:rgba(229,72,77,.1);color:var(--danger)">去开启</span><span class="ic ch">' + IC.chev + '</span></div>';
+}
+function toggleAlarm(){
+  if (S.alarmOn){ S.alarmOn = false; S.alarm = [-1,0]; render(); toast('定时唤醒已关闭'); return; }
+  enableAlarm(); permSheet();   // 打开后弹权限清单，用户在弹窗里自行决定去不去开
+}
+function enableAlarm(){ S.alarmOn = true; if (S.alarm[0] < 0) S.alarm = [8,0]; render(); toast('定时唤醒已开启'); }
+function permGrant(k){ S.perm[k] = true; permSheet(); }
+function permSheet(){
+  const rows = PERMS.map(function(p){
+    const onv = S.perm[p.k];
+    return '<div class="pmrow"><div class="pmmid"><div class="pmt">' + p.t +
+      (p.must ? '<span class="pmust">建议</span>' : '') + '</div><div class="pms">' + p.s + '</div></div>' +
+      (onv ? '<span class="tag done">已开启</span>'
+           : '<button class="mini primary" onclick="permGrant(\'' + p.k + '\')">去开启</button>') + '</div>';
+  }).join('');
+  dialog('<h4>定时唤醒相关权限</h4>' +
+    '<p style="margin:2px 0 12px;color:var(--dim);font-size:12.5px">下面这些按需自行开启，不开也能用，只是个别场景可能不够稳（精确闹钟不开会明显不准）。</p>' +
+    '<div class="pmlist">' + rows + '</div>' +
+    '<div class="row2" style="margin-top:14px">' +
+      '<button onclick="closeDialog()">取消</button>' +
+      '<button class="pri" onclick="closeDialog()">确定</button>' +
+    '</div>');
+}
 function settings(){
-  let h = '<div class="sublabel">发送</div><div class="card" style="padding-top:4px;padding-bottom:4px">' +
-    trow('自动续火花','', S.enabled, "S.enabled=!S.enabled;render()") +
-    trow('只在设定时间检查','其余时间不动', S.checkAtAlarm, "S.checkAtAlarm=!S.checkAtAlarm;render()") +
+  const on = S.enabled, at = S.checkAtAlarm;
+  const tstr = S.alarm[0] >= 0 ? hhmm(S.alarm[0], S.alarm[1]) : '—';
+  let h = '';
+
+  // 概览卡
+  h += '<div class="hero" style="margin-top:12px;padding:14px 18px 15px">' +
+    '<div class="lab"><i></i>自动续火花 · ' + (on ? '已开启' : '已关闭') + '</div>' +
+    '<div class="hstat" style="margin-top:9px">' +
+      '<span>每天 <b>' + tstr + '</b> 唤醒</span>' +
+      '<span>调度兜底 <b>' + (S.alarmOn ? '正常' : '未启用') + '</b></span>' +
+      '<span>只在设定时间 <b>' + (at ? '开' : '关') + '</b></span>' +
+    '</div></div>';
+
+  // 续火花
+  h += secHead('续火花', '打开后在抖音进程里自动检查并发送；关掉只能手动发。');
+  h += '<div class="card" style="padding-top:6px;padding-bottom:6px">' +
+    trow('自动续火花', '打开抖音时自动检查并发送', on, 'S.enabled=!S.enabled;render()') +
+    trow('只在设定时间检查', '关掉就是每次打开抖音都检查一遍', at, 'S.checkAtAlarm=!S.checkAtAlarm;render()') +
     '</div>';
 
-  h += '<div class="sublabel">定时唤醒</div><div class="card" style="padding-top:4px;padding-bottom:4px">' +
-    irow('refresh','每天唤醒抖音','发完就关，需要 root', hhmm(S.alarm[0],S.alarm[1]), "pickTime()");
-  if (S.alarm[0] >= 0) h += '<div class="iconrow" onclick="S.alarm=[-1,0];render()" style="color:var(--danger)">' +
-    '<span class="ic gi">' + IC.close + '</span><div class="mid"><div class="tt" style="color:var(--danger)">关闭定时唤醒</div>' +
-    '<div class="st">不再自动叫醒抖音</div></div></div>';
-  h += '</div><div class="note"><i></i><p>唤醒走 root 的 monkey，发完会 force-stop 抖音。没 root 的话只能在打开抖音时检查。</p></div>';
+  // 定时唤醒（开关；打开时自动做权限检测并引导）
+  h += secHead('定时唤醒', '优先免 root 拉起抖音（preload provider），失败回退 root + monkey；发完 force-stop。');
+  h += '<div class="card" style="padding-top:6px;padding-bottom:6px">' +
+    trow('定时唤醒', '开启后到点自动打开抖音，锁屏也能发', S.alarmOn, 'toggleAlarm()');
+  if (S.alarmOn) {
+    h += irow('refresh', '唤醒时间', '每天这个时间自动叫醒抖音', tstr, 'pickTime()') + permRow();
+    h += '<div class="iconrow" style="cursor:default"><span class="ic gi">' + IC.shield + '</span>' +
+      '<div class="mid"><div class="tt">调度兜底</div><div class="st">定时唤醒被系统清掉时，每 15 分钟自动补排一次</div></div>' +
+      '<span class="tag done">正常</span></div>';
+    h += wakeRow();
+  } else {
+    h += '<div class="iconrow" style="cursor:default"><span class="ic gi">' + IC.shield + '</span>' +
+      '<div class="mid"><div class="tt">已关闭</div><div class="st">开启后才会到点唤醒；可设置时间、查看唤醒日志</div></div></div>';
+  }
+  h += '</div>';
 
-  h += '<div class="sublabel">诊断</div><div class="card" style="padding-top:4px;padding-bottom:4px">' +
-    irow('graph','运行日志','宿主最近 60 行', String(parseNote().length) + ' 行', "openLog()") +
-    irow('refresh','宿主心跳','抖音进程上次响应','刚刚',"openText('宿主心跳','hostAliveAt：2026-11-26 22:14:08\\nhostNoteAt：2026-11-26 22:14:08')") +
-    irow('check','安装包自校验','签名与内置指纹比对','正常',"openText('安装包自校验','内置指纹：已匹配\\n签名：release\\n上次校验：刚刚')") +
+  // 数据与工具
+  h += secHead('数据与工具', '');
+  h += '<div class="card" style="padding-top:6px;padding-bottom:6px">' +
+    irow('book', '运行日志', '抖音进程最近写下的话', '查看', 'openLog()') +
+    irow('check', '系统诊断', '安装包自校验', '正常', "openText('系统诊断','安装包自校验：签名已匹配、指纹正常')") +
     '</div>';
 
-  h += '<div class="sublabel">数据</div><div class="card" style="padding-top:4px;padding-bottom:4px">' +
-    irow('copy','导出配置','把整份配置复制成 JSON','',"toast('配置 JSON 已复制到剪贴板')") +
-    irow('import','导入配置','从剪贴板读回来覆盖','',"confirmBox('导入配置','会用剪贴板里的 JSON 覆盖当前全部设置，这个动作不能撤销。','覆盖',function(){toast('已导入，界面已刷新')},true)") +
-    irow('clear','清空今日已发记录','只清「已发」标记，不动会话','清空',"confirmBox('清空今日已发记录','今天所有会话都会重新变成「待发」。','清空',function(){D.rows.forEach(function(r){r.s=false});render();toast('已清空今日记录')},true)") +
+  // 关于
+  h += secHead('关于', '');
+  h += '<div class="card" style="padding-top:6px;padding-bottom:6px">' +
+    irow('info', '版本', '', 'v3.4.5（34500）') +
+    irow('info', '许可与来源', '', 'Apache-2.0', "openText('许可与来源','Apache License 2.0 · 部分交互表情名与协议来自 yfishyon/doumcp（Apache-2.0）。')") +
+    irow('link', '源码', '', 'GitHub', "toast('浏览器里打开仓库')") +
+    irow('book', '使用文档', '', '查看', "go('docs')") +
     '</div>';
 
-  h += '<div class="sublabel">关于</div><div class="card" style="padding-top:4px;padding-bottom:4px">' +
-    irow('info','版本','v3.4.5（34500）','',"toast('v3.4.5（34500）')") +
-    irow('info','许可与来源','Apache-2.0','',"openText('许可与来源','Apache License 2.0\\n部分交互表情名与协议来自 yfishyon/doumcp（Apache-2.0）。')") +
-    irow('link','源码','github.com/tiantong007/…douyinspark','',"toast('浏览器里打开仓库')") +
-    '</div>';
   return h;
+}
+
+function secHead(t, tip){
+  return '<div class="sec"><div class="sublabel">' + t + '</div>' +
+    (tip ? '<span class="q" title="' + tip.replace(/"/g, '&quot;') + '">?</span>' : '') + '</div>';
 }
 
 function docs(){ return ''; }
@@ -792,7 +1057,7 @@ function go(page){
 function askSend(){
   const n = S.picked.size;
   const skip = noScriptCount();
-  confirmBox('立即发送', '现在给选中的 ' + n + ' 个会话发消息？' + (skip > 0 ? '\n其中 ' + skip + ' 个没有文案，不会发送。' : ''), '发送', function(){
+  confirmBox('立即发送给 ' + n + ' 个会话？', '手动发送不受总开关与「今日已发」限制。' + (skip > 0 ? '\n其中 ' + skip + ' 个没有文案，不会发送。' : ''), '发送', function(){
     const skip = noScriptCount(); S.picked.clear(); render(); toast('已发 ' + (n - skip) + ' / 跳过 ' + skip + ' / 失败 0');
   });
 }
@@ -1057,8 +1322,10 @@ function insertAtCursor(text){
 function pickSticker(){
   dialog('<h4>互动表情 · ' + EMOJIS.length + ' 个</h4>' +
     '<div class="hint" style="margin:-4px 0 10px">和抖音里的一致。脚本空的插一整句；已有内容会另起一整句 push（表情是对象，不能和文字相加）。</div>' +
-    '<div class="stk">' + EMOJIS.map(n =>
-      '<button onclick="insertSticker(\'' + n + '\')">' + n + '</button>').join('') + '</div>' +
+    '<div class="stk">' + EMOJIS.map(function(n){
+      const img = EMBIMG[n] ? '<img src="emoji/' + EMBIMG[n] + '.png" alt="">' : '<span class="sf ic">' + IC.fire + '</span>';
+      return '<button onclick="insertSticker(\'' + n + '\')">' + img + '<span class="sn">' + n + '</span></button>';
+    }).join('') + '</div>' +
     '<div class="row2" style="margin-top:12px"><button onclick="closeDialog()">取消</button></div>');
 }
 function findLastPush(text){
@@ -1152,7 +1419,7 @@ function openEditor(id){
   const body = BODY[r.id] || '';
   const has = !!body.trim();
   showSheet('编辑脚本',
-    '<div class="hint" id="tplhint" style="margin-bottom:2px">' + tplHint(r, has) + (r.tpl !== -1 ? ' <span class="rst" onclick="resetTpl()">重置</span>' : '') + '</div>' +
+    '<div class="hint" id="tplhint" style="margin-bottom:2px;display:flex;align-items:center;gap:8px">' + '<span style="flex:1">' + tplHint(r, has) + '</span>' + (r.tpl !== -1 ? '<span class="rst" style="margin-left:auto" onclick="resetTpl()">重置</span>' : '') + '</div>' +
     (has ? '' : '<div class="hint" style="color:#E0523B;margin-top:6px">这个会话还没有文案，发送时会被跳过。</div>') +
     '<textarea class="script" id="ed" spellcheck="false" oninput="cntEd(this)" onpaste="cleanPaste(event)"' +
       (has ? '' : ' placeholder="写点东西：直接输入文字，或用下面按钮插入表情 / 变量"') +
@@ -1205,7 +1472,9 @@ function inlinePreview(btn){
   if (box.querySelector('.inline-prev')) { box.querySelector('.inline-prev').remove(); return; }
   const d = document.createElement('div');
   d.className = 'inline-prev';
-  d.innerHTML = '<div style="height:1px;background:var(--line);margin:14px 0 2px"></div>' + previewHtml('ctx.result.push({ type: "emoji", name: "续火花" });');
+  const ta = document.getElementById('ed');
+  const code = (ta && ta.value.trim()) ? ta.value : 'ctx.result.push({ type: "emoji", name: "续火花" });';
+  d.innerHTML = '<div style="height:1px;background:var(--line);margin:14px 0 2px"></div>' + previewHtml(code);
   box.appendChild(d);
   d.scrollIntoView({block:'nearest'});
 }
@@ -1311,45 +1580,47 @@ function cleanPaste(ev){
 }
 
 function docsPage(){
+  const mdEl = document.getElementById('manualMd');
+  const md = mdEl ? mdEl.textContent : '';
   return '<div class="doc">' +
     '<div class="actions" style="margin:0 0 10px">' +
       '<button class="mini" onclick="copyDoc()">复制全文</button>' +
       '<button class="mini" onclick="shareDoc()">分享</button></div>' +
-    '<h2>续火花 · 使用说明</h2>' +
-    '<div class="hint">真机里这一页是 WebView 渲染安装包内的 <code>assets/docs/manual.md</code>，和仓库 README 是同一份内容。</div>' +
-
-    '<h3>1　装好之后先做一次</h3>' +
-    '<ol><li>在 LSPosed 里勾上「抖音」，作用域只需要 <code>com.ss.android.ugc.aweme</code>。</li>' +
-    '<li>强停抖音再打开，进一次消息列表，让模块读到会话。</li>' +
-    '<li>回到本应用，右上角齿轮旁的刷新（或下拉）会拉到最新会话与火花天数。</li></ol>' +
-    '<p>没有 root 也能发，只是定时唤醒用不了；有 root 才能在凌晨锁屏状态下自动叫醒抖音。</p>' +
-
-    '<h3>2　每天是怎么跑的</h3>' +
-    '<p>默认在设定时间检查一次，把「今天还没续、且有火花」的会话挑出来，逐个按模板脚本发送。发完会在会话里留一条「今日已发」的标记，同一天不会重复发。</p>' +
-    '<p>失败会重试一次；连续多天找不到的会话会被自动隐藏，不会再占用列表。</p>' +
-
-    '<h3>3　状态看板的两行分段</h3>' +
-    '<p><b>第一行（火花状态）</b>：全部 / 已燃 / 待燃 / 待续 / 无火花。已燃 = 今天已经互动过；待燃 = 今天发过了、等对方回；待续 = 今天还没发、抖音说该续；无火花 = 两边还没有火花，发也燃不起来。</p>' +
-    '<p><b>第二行（发送名单）</b>：自动发送 / 不发送。这一行跟「今天发没发过」无关，只回答总开关打开后谁会被自动续 —— 有火花的都在名单里，固定发送的没火花也发，固定不发的永远不发。两行互斥，点哪行哪行生效。</p>' +
-    '<p>点一行进去改这个会话的脚本；看板行尾的开关只是「选中」，选够了右下角才会出现「立即发送 N 个」，点它才会真正发。名单行的行尾是规则按钮：默认态给「固定发送 / 固定不发」两个，固定后给「恢复默认 + 另一个」。</p>' +
-
-    '<h3>4　脚本怎么写</h3>' +
-    '<p>脚本是一段 JS，能用的就三件事：往结果里放东西、分段、发表情。</p>' +
-    '<pre>// 一条文字\nctx.result.push("晚上好 🔥");\n\n// 分成两条发\nctx.result.push("第一条");\nctx.commit();\nctx.result.push("第二条");\n\n// 发一个互动表情（自成一条）\nctx.result.push({ type: "emoji", name: "续火花" });</pre>' +
-    '<p>脚本写几段就发几段，没有条数上限；不过一次发太多条容易被抖音判定骚扰，建议 1～3 条。脚本没产出内容就当作「跳过」，不会发空消息。</p>' +
-
-    '<h3>5　变量</h3>' +
-    '<p>变量在发送那一刻取值，写法是带命名空间的完整路径：</p>' +
-    '<ul><li><code>ctx.builtin.date</code> / <code>time</code> / <code>weekday</code> / <code>timestamp</code> —— 时间。</li>' +
-    '<li><code>ctx.io.nickname</code> / <code>remark</code> / <code>name</code> / <code>days</code> / <code>stateText</code> / <code>peerUid</code> / <code>id</code> —— 这个会话的对方信息，<code>ctx.io.name</code> 是备注优先的显示名。</li>' +
-    '<li><code>ctx.template.vars["名字"]</code> —— 你自己在模板里定义的变量，用引号包住名字。</li></ul>' +
-    '<p>模板里写的变量所有会话共用，会话里写的只对那一个生效，同名时会话优先。</p>' +
-
-    '<h3>6　出问题时</h3>' +
-    '<p>设置 → 运行日志里是宿主最近回写的几十行，先看有没有「会话列表未就绪」这类提示。<b>宿主心跳</b>显示抖音进程最后一次响应的相对时间，超过几分钟说明抖音被系统杀了。</p>' +
-    '<p>脚本报错会直接写在发送结果里，形如「脚本第 3 行出错：missing variable name」，行号是脚本自身的行号，不含内部包装。</p>' +
+    '<div class="hint" style="margin:0 0 12px">真机里这一页是 WebView 渲染安装包内的 <code>assets/docs/manual.md</code>，和仓库 README 是同一份内容 —— 这里直接把同一份 markdown 渲染出来。</div>' +
+    '<div class="docbody">' + renderMd(md) + '</div>' +
     '</div>';
 }
+function renderMd(md){
+  md = String(md || '').replace(/<!--[\s\S]*?-->/g, '');
+  const lines = md.split(/\r?\n/);
+  const out = [];
+  const inline = s => esc(s)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+    .replace(/&lt;(https?:\/\/[^&]+?)&gt;/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+  let i = 0;
+  while (i < lines.length){
+    const ln = lines[i];
+    if (/^```/.test(ln)){ const buf = []; i++; while (i < lines.length && !/^```/.test(lines[i])){ buf.push(lines[i]); i++; } i++; out.push('<pre>' + esc(buf.join('\n')) + '</pre>'); continue; }
+    if (/^\s*$/.test(ln)){ i++; continue; }
+    let m;
+    if ((m = /^(#{1,4})\s+(.*)$/.exec(ln))){ const lv = m[1].length + 1; out.push('<h' + lv + '>' + inline(m[2]) + '</h' + lv + '>'); i++; continue; }
+    if (/^---+\s*$/.test(ln)){ out.push('<hr>'); i++; continue; }
+    if (/^\s*\|.*\|\s*$/.test(ln)){ const tb = []; while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])){ tb.push(lines[i]); i++; }
+      const cells = r => r.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+      let t = '<table>'; let hr = 0;
+      tb.forEach(function(r){ if (/^\s*\|[\s:\-|]+\|\s*$/.test(r)){ hr = 1; return; } const cs = cells(r); t += '<tr>' + cs.map(function(c){ return hr ? '<td>' + inline(c) + '</td>' : '<th>' + inline(c) + '</th>'; }).join('') + '</tr>'; });
+      out.push(t + '</table>'); continue; }
+    if (/^\s*[-*]\s+/.test(ln)){ const li = []; while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])){ li.push('<li>' + inline(lines[i].replace(/^\s*[-*]\s+/, '')) + '</li>'); i++; } out.push('<ul>' + li.join('') + '</ul>'); continue; }
+    if (/^\s*\d+\.\s+/.test(ln)){ const li = []; while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])){ li.push('<li>' + inline(lines[i].replace(/^\s*\d+\.\s+/, '')) + '</li>'); i++; } out.push('<ol>' + li.join('') + '</ol>'); continue; }
+    if (/^\s*<(img|br|hr)\b/i.test(ln)){ out.push(ln.replace(/(src=["'])docs\/ui\//gi, '$1')); i++; continue; }
+    const para = []; while (i < lines.length && !/^\s*$/.test(lines[i]) && !/^(#{1,4})\s|^```|^---+\s*$|^\s*\||^\s*[-*]\s|^\s*\d+\.\s/.test(lines[i])){ para.push(lines[i]); i++; }
+    out.push('<p>' + inline(para.join(' ')) + '</p>');
+  }
+  return out.join('\n');
+}
+
 
 // spec 表
 document.getElementById('spec').innerHTML = [

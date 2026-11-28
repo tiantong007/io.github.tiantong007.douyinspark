@@ -51,6 +51,12 @@
             </intent-filter>
         </receiver>
 
+        <!-- 调度兜底：15 分钟周期 JobScheduler，只负责把一次性闹钟重新排上（防被厂商冻结/清掉） -->
+        <service
+            android:name="com.tiantong.spark.app.alarm.ScheduleGuardService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
         <!--
              续火花管理界面：桌面图标入口 + 抖音设置页注入口（由抖音进程唤起，故需 exported）。
 

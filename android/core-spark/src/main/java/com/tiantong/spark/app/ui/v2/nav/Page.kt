@@ -5,7 +5,7 @@ import com.tiantong.spark.app.ui.v2.theme.Tokens
 
 /** 主页面。抽屉按这个顺序排列，也决定返回栈的根。 */
 enum class Page(val label: String, val glyph: String) {
-    HOME("抖音续火花cc", Tokens.Icon.FIRE),
+    HOME("状态看板", Tokens.Icon.FIRE),
     TEMPLATES("模板", Tokens.Icon.TEMPLATE),
     SETTINGS("设置", Tokens.Icon.GEAR),
 
@@ -17,7 +17,7 @@ enum class Page(val label: String, val glyph: String) {
      * 抽屉里显示的名字。
      *
      * 首页在抽屉里叫「状态看板」——抽屉其余几项都是功能名（模板 / 设置 / 使用文档），
-     * 只有首页原本写产品名，读起来不齐；产品名留在标题栏和抽屉头部。
+     * 只有首页原本写产品名，读起来不齐；产品名只留在抽屉头部（标题栏也统一为「状态看板」）。
      */
     val drawerLabel: String get() = if (this == HOME) "状态看板" else label
 

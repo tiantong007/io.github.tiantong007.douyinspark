@@ -154,6 +154,10 @@ class AppState(context: Context) {
     fun recordedAt(): Long =
         config.snapshots.maxOfOrNull { it.updatedAt }?.takeIf { it > 0 } ?: config.hostNoteAt
 
+    /** 抖音进程是否在线：最近 5 分钟内有回话（hostAliveAt）。 */
+    fun hostOnline(): Boolean =
+        config.hostAliveAt > 0 && System.currentTimeMillis() - config.hostAliveAt <= 5 * 60 * 1000L
+
     /** 今天进度：已发 / 该续。 */
     fun progress(): Pair<Int, Int> = sentList().size to renewable().size
 

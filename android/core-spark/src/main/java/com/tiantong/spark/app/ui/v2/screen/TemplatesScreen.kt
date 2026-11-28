@@ -54,7 +54,7 @@ class TemplatesScreen(private val shell: Shell) : PageView {
         root.removeAllViews()
         val config = shell.state.config
 
-        root.addView(ctx.sectionLabel("内置起点"))
+        root.addView(ctx.sectionLabel("内置模板"))
         BuiltinTemplates.ALL.forEach { builtin ->
             root.addView(
                 ctx.card(14).apply {
@@ -67,6 +67,17 @@ class TemplatesScreen(private val shell: Shell) : PageView {
                         ctx.lp(MATCH, WRAP),
                     )
                     addView(ctx.text(builtin.desc, Tokens.T_TINY, Tokens.INK_DIM), ctx.lp(MATCH, WRAP, top = 4))
+                    val builtinPreview = builtin.body.lineSequence().filter { it.isNotBlank() }.take(3).joinToString("\n")
+                    addView(
+                        ctx.mono(builtinPreview.ifBlank { "（空模板）" }, 12f, Tokens.EDITOR_TEXT).apply {
+                            maxLines = 3
+                            ellipsize = android.text.TextUtils.TruncateAt.END
+                            setLineSpacing(ctx.dpF(2f), 1f)
+                            setPadding(ctx.dp(12), ctx.dp(10), ctx.dp(12), ctx.dp(10))
+                            background = ctx.shape(Tokens.EDITOR_BG, 14)
+                        },
+                        ctx.lp(MATCH, WRAP, top = 8),
+                    )
                     addView(
                         ctx.row().apply {
                             gravity = Gravity.END

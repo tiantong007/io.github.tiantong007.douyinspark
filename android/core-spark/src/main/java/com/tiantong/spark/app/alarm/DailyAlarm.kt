@@ -1,9 +1,10 @@
-﻿package com.tiantong.spark.app.alarm
+package com.tiantong.spark.app.alarm
 
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import java.util.Calendar
 
@@ -17,7 +18,8 @@ import java.util.Calendar
  *
  * ```
  * AlarmManager 到点 → AlarmReceiver（本模块进程）
- *                   → root + monkey 拉起抖音（不亮屏）
+ *                   → 优先免 root：抖音 preload provider 拉起主进程
+ *                     （不可达则回退 root + monkey，不亮屏）
  *                   → 抖音进程启动 → Application.attach 被 hook
  *                   → scheduleOnAppStart() → 扫描 + 发送
  *                   → AlarmReceiver 检测到已发 → am force-stop 关掉
@@ -25,14 +27,15 @@ import java.util.Calendar
  *
  * 发送本身不需要屏幕亮着、也不需要解锁 —— 它只走 IM SDK 的发送链路。
  *
- * ## 为什么用 monkey 而不是 startActivity
+ * ## 为什么优先免 root、再回退 monkey
  *
- * `startActivity` 在后台会被 `backgroundActivityAllowed=false` 拦（实测
- * `dumpsys alarm` 的 idle-options 里是这个值）。`monkey -p <pkg> -c LAUNCHER 1`
- * 走 AMS 的注入通道，实测能在**锁屏 + Doze** 状态下拉起抖音且**不点亮屏幕**。
+ * 免 root 走 `content://<抖音包>.depths.pre.load` 的 provider client，取 client 会顺带
+ * 把抖音主进程拉起来，不需要 su；provider 不可达时再回退 root + `monkey`
+ * （`monkey -p <pkg> -c LAUNCHER 1` 走 AMS 注入通道，锁屏 + Doze 下能拉起且不亮屏，
+ * 但只接受 root / shell 身份，普通 App 执行会被 `Killed`）。
  *
- * 代价：monkey 只接受 root 或 shell 身份，普通 App 身份执行会被 `Killed`。
- * **所以这条路依赖 root。没 root 时直接失败，不降级到 startActivity。**
+ * 两条路都不用 startActivity：后台 startActivity 会被 `backgroundActivityAllowed=false` 拦，
+ * 且会亮屏、打断用户正在用的应用。
  *
  * ## 权限
  *
@@ -80,9 +83,17 @@ object DailyAlarm {
         val pending = pendingIntent(context)
         if (manager == null || pending == null) return
         cancel(context)
-        if (hour !in 0..23) return
+        if (hour !in 0..23) {
+            ScheduleGuardService.cancel(context)
+            return
+        }
         val at = nextTriggerAt(hour, minute)
-        if (at <= 0L) return
+        if (at <= 0L) {
+            ScheduleGuardService.cancel(context)
+            return
+        }
+        // 调度兜底：登记一个 15 分钟周期 JobScheduler，防单一 alarm 被厂商冻结/清掉后彻底不响
+        ScheduleGuardService.schedule(context)
 
         // 先试精确闹钟；没权限就退到「doze 也能响但不精确」
         val exact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || manager.canScheduleExactAlarms()
@@ -111,22 +122,37 @@ object DailyAlarm {
     }
 
     /**
-     * 拉起抖音，**只走 root + monkey**。
+     * 拉起抖音，两条路：**先免 root，失败再回退 root + monkey**。
      *
-     * 为什么不用 startActivity：
-     * - Android 10+ 的 `backgroundActivityAllowed=false` 会让后台 startActivity 被拦；
-     * - `monkey -p <pkg> -c LAUNCHER 1` 是系统 shell 工具，走的是 AMS 的注入通道，
-     *   实测**不点亮屏幕**（`mWakefulness` 保持 Asleep）且能清掉 `stopped=true`；
-     * - 但它要求调用方是 root 或 shell，普通 App 身份跑会被 `Killed`。
+     * 1. 免 root：`acquireUnstableContentProviderClient` 向抖音 preload provider 取 client，
+     *    会触发抖音主进程启动，不需要 su（见 [tryPreload]）。
+     * 2. 回退 root：`monkey -p <pkg> -c LAUNCHER 1` 走 AMS 注入通道，实测不点亮屏幕
+     *    （`mWakefulness` 保持 Asleep）且能清掉 `stopped=true`；但它要求 root / shell 身份，
+     *    普通 App 身份跑会被 `Killed`（见 [RootShell.monkeyLaunch]）。
      *
-     * 没有 root 就直接失败 —— 不降级到 startActivity。原因：startActivity 会亮屏、
-     * 打断用户正在用的应用，且大概率被 BAL 拦掉，属于「看着像在工作其实不可靠」。
-     * 与其静默降级，不如让设置页明确显示「需要 root」。
+     * 都不用 startActivity：Android 10+ 的 `backgroundActivityAllowed=false` 会拦后台
+     * startActivity，且会亮屏、打断用户正在用的应用，不可靠。
      *
      * @return 用了哪条路，用于日志对账。
      */
-    fun launchDouyin(): LaunchMethod =
-        RootShell.monkeyLaunch(DOUYIN_PACKAGE) ?: LaunchMethod.FAILED
+    fun launchDouyin(context: Context): LaunchMethod {
+        // 1) 先试免 root：向抖音 preload provider 取 client 会拉起抖音主进程，不需要 su
+        if (tryPreload(context)) return LaunchMethod.PRELOAD
+        // 2) 免 root 失败再回退 root + monkey（不亮屏）
+        return RootShell.monkeyLaunch(DOUYIN_PACKAGE) ?: LaunchMethod.FAILED
+    }
+
+    /**
+     * 免 root 拉起：`acquireUnstableContentProviderClient` 会触发目标进程（抖音）启动。
+     * provider 未导出 / 不存在时抛异常或返回 null，一律当作失败，交给 root 兜底。
+     */
+    private fun tryPreload(context: Context): Boolean =
+        runCatching {
+            val uri = Uri.parse("content://$DOUYIN_PACKAGE.depths.pre.load")
+            val client = context.contentResolver.acquireUnstableContentProviderClient(uri) ?: return@runCatching false
+            runCatching { client.close() }
+            true
+        }.getOrDefault(false)
 
     /** 把抖音关掉。 */
     fun stopDouyin(): Boolean = RootShell.amKill(DOUYIN_PACKAGE)
@@ -136,7 +162,10 @@ object DailyAlarm {
         /** root + monkey，不亮屏 */
         MONKEY,
 
-        /** 没成功（没 root / monkey 被拒 / 抖音没装） */
+        /** 免 root：preload provider 拉起抖音主进程 */
+        PRELOAD,
+
+        /** 没成功（preload 与 root 都没成 / 抖音没装） */
         FAILED,
     }
 

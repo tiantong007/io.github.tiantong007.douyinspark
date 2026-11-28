@@ -118,11 +118,14 @@ class HomeScreen(private val shell: Shell) : PageView {
         body.addView(
             ctx.row().apply {
                 gravity = Gravity.CENTER_VERTICAL
+                val online = state.hostOnline()
                 addView(
-                    View(ctx).apply { background = ctx.shape(0xFF35D0A5.toInt(), 5) },
+                    View(ctx).apply {
+                        background = ctx.shape(if (online) 0xFF35D0A5.toInt() else 0xFF8A8F98.toInt(), 5)
+                    },
                     ctx.lp(5, 5, right = 7),
                 )
-                addView(ctx.text("记录时间 ${recordTime()}", 11.5f, Tokens.ON_HERO_DIM))
+                addView(ctx.text("记录时间 ${recordTime()} · 抖音" + if (online) "在线" else "离线", 11.5f, Tokens.ON_HERO_DIM))
             },
         )
 
@@ -288,8 +291,8 @@ class HomeScreen(private val shell: Shell) : PageView {
             }
         }
 
-        // 私聊在上、群聊在下；点段头折叠，只影响显示，不影响勾选与全选。
-        addSection("私聊", persons, state.gsecPerson) {
+        // 好友在上、群聊在下；点段头折叠，只影响显示，不影响勾选与全选。
+        addSection("好友", persons, state.gsecPerson) {
             state.gsecPerson = !state.gsecPerson
             shell.rebuild()
         }
@@ -309,19 +312,19 @@ class HomeScreen(private val shell: Shell) : PageView {
         return box
     }
 
-    /** 群/私聊分段头：▾/▸ + 标题 + 人数，整行可点折叠。 */
+    /** 群/好友分段头：▾/▸ + 标题 + 人数，整行可点折叠。 */
     private fun sectionHeader(title: String, count: Int, collapsed: Boolean, onToggle: () -> Unit): View =
         ctx.row().apply {
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(ctx.dp(15), ctx.dp(10), ctx.dp(15), ctx.dp(6))
+            setPadding(ctx.dp(15), ctx.dp(12), ctx.dp(15), ctx.dp(8))
             isClickable = true
             setOnClickListener { onToggle() }
             addView(
-                ctx.text(if (collapsed) "▸" else "▾", 12f, Tokens.INK_DIM, bold = true),
-                ctx.lp(WRAP, WRAP, right = 6),
+                ctx.text(if (collapsed) "▸" else "▾", 13.5f, Tokens.INK_DIM, bold = true),
+                ctx.lp(WRAP, WRAP, right = 7),
             )
-            addView(ctx.text(title, 12.5f, Tokens.INK_DIM, bold = true), ctx.lp(0, WRAP, 1f))
-            addView(ctx.text("$count", 11.5f, Tokens.INK_FAINT, bold = true), ctx.lp(WRAP, WRAP))
+            addView(ctx.text(title, 14.5f, Tokens.INK, bold = true), ctx.lp(0, WRAP, 1f))
+            addView(ctx.text("$count", 12.5f, Tokens.INK_FAINT, bold = true), ctx.lp(WRAP, WRAP))
         }
 
     /** 失联名单行：id 已不在会话列表里，只留着用户设过的归属。 */
@@ -431,8 +434,8 @@ class HomeScreen(private val shell: Shell) : PageView {
                 },
                 ctx.lp(WRAP, WRAP, right = 6),
             )
-            nameRow.addView(ctx.icon(Tokens.Icon.FIRE, 12f, Tokens.ACCENT), ctx.lp(WRAP, WRAP, right = 3))
             if (snapshot.hasSpark) {
+                nameRow.addView(ctx.icon(Tokens.Icon.FIRE, 12f, Tokens.ACCENT), ctx.lp(WRAP, WRAP, right = 3))
                 nameRow.addView(ctx.text("${snapshot.days}", 14.5f, Tokens.INK, bold = true))
                 nameRow.addView(ctx.text("天", 14.5f, Tokens.INK, bold = true))
             }
@@ -553,11 +556,7 @@ class HomeScreen(private val shell: Shell) : PageView {
             !snapshot.hasSpark && snapshot.stateText == "可点亮" -> tag("可点亮", Tokens.INFO, Tokens.INFO_SOFT)
             !snapshot.hasSpark -> tag("无火花", Tokens.MUTED, Tokens.MUTED_SOFT)
             snapshot.state == 1 -> tag("已燃", Tokens.OK, Tokens.OK_SOFT)
-            snapshot.state == 3 -> {
-                val frac = Regex("""(\d+)\s*/\s*(\d+)""").find(snapshot.flameText)
-                val label = if (frac == null) "重燃中" else "重燃中 ${frac.groupValues[1]}/${frac.groupValues[2]}"
-                tag(label, 0xFFB45309.toInt(), Tokens.WARN_SOFT)
-            }
+            snapshot.state == 3 -> tag("重燃中", 0xFFB45309.toInt(), Tokens.WARN_SOFT)
             sent -> tag("待燃", Tokens.WARN, Tokens.WARN_SOFT)
             else -> tag("待续", Tokens.WARN, Tokens.WARN_SOFT)
         }

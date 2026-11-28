@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Bundle
 import com.tiantong.spark.app.config.ConfigClient
 import com.tiantong.spark.core.ModLog
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
@@ -28,6 +29,9 @@ object EmojiImageCache {
     private const val CONNECT_TIMEOUT_MS = 8_000
     private const val READ_TIMEOUT_MS = 8_000
     private const val USER_AGENT = "Mozilla/5.0 (Linux; Android 14)"
+
+    /** 宿主进程里按对象名去域名化缓存的子目录（`cacheDir/emoji_dl/`）。 */
+    private const val DL_CACHE_DIR = "emoji_dl"
 
     /**
      * 把一批表情图推给模块。返回本次推送的张数。
@@ -57,7 +61,7 @@ object EmojiImageCache {
 
         items.forEach { (name, url) ->
             if (name.isBlank() || url.isBlank()) return@forEach
-            val bytes = download(url) ?: return@forEach
+            val bytes = download(context, url) ?: return@forEach
             if (bytes.size > MAX_IMAGE_BYTES) return@forEach
             batch.putByteArray(keyOf(name), bytes)
             batchUrls.putString(keyOf(name), url)
@@ -76,7 +80,40 @@ object EmojiImageCache {
             .digest(name.trim().toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
 
-    private fun download(url: String): ByteArray? {
+    /**
+     * 按**对象名去域名化**缓存后再下载：key = URL `/obj/` 之后的路径（不含 CDN 域名）。
+     *
+     * 这样 CDN 换域名时（`p11-sign.douyinpic.com` → 别的域），同一张图的对象路径没变，
+     * 直接命中宿主进程自己的缓存，不会全量重下。缓存放在抖音进程的 `cacheDir/emoji_dl/`。
+     * 取不到 `/obj/` 时退化成整条 URL 的 md5，行为与旧版一致。
+     */
+    private fun download(
+        context: Context,
+        url: String,
+    ): ByteArray? {
+        val cacheFile = File(File(context.cacheDir, DL_CACHE_DIR), objectKey(url))
+        if (cacheFile.isFile && cacheFile.length() in 1..MAX_IMAGE_BYTES.toLong()) {
+            runCatching { cacheFile.readBytes() }.getOrNull()?.let { return it }
+        }
+        val bytes = httpGet(url) ?: return null
+        runCatching {
+            cacheFile.parentFile?.mkdirs()
+            cacheFile.writeBytes(bytes)
+        }
+        return bytes
+    }
+
+    /** CDN 去域名化后的缓存 key：取 URL `/obj/` 起的路径；没有则用整条 URL。 */
+    private fun objectKey(url: String): String {
+        val i = url.indexOf("/obj/")
+        val tail = if (i >= 0) url.substring(i) else url
+        return MessageDigest
+            .getInstance("MD5")
+            .digest(tail.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+    }
+
+    private fun httpGet(url: String): ByteArray? {
         var connection: HttpURLConnection? = null
         return runCatching {
             connection = (URL(url).openConnection() as HttpURLConnection).apply {
